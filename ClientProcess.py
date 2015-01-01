@@ -2,8 +2,10 @@ import socket, datetime, time, threading, sys
 from multiprocessing import Process
 
 KEEPALIVE_TIME_GAP = 2; #seconds
-HOST = '127.0.0.1'   # Symbolic name meaning all available interfaces
-PORT = 8888 # Arbitrary non-privileged port
+SHOST = '127.0.0.1'   # Symbolic name meaning all available interfaces
+SPORT = 8888 # Arbitrary non-privileged port
+CHOST = '127.0.0.1'   # Symbolic name meaning all available interfaces
+CPORT = 9990 # Arbitrary non-privileged port
 now=datetime.datetime.now()
 
 
@@ -13,16 +15,17 @@ def getExecuteTime():
               
 
 class keepAliveThread (threading.Thread):
-    def __init__(self,keepAliveTime,nextkeepAliveTime):
+    def __init__(self,keepAliveTime,nextkeepAliveTime,doneFlag):
         self.process = None
         threading.Thread.__init__(self)
         self.keepAliveTime = keepAliveTime
         self.nextkeepAliveTime = nextkeepAliveTime
+        self.doneFlag = doneFlag
     def run(self):
         # Connect to the server:
        
         client = socket.socket ( socket.AF_INET, socket.SOCK_STREAM )
-        client.connect ( ( HOST, PORT ) )
+        client.connect ( ( SHOST, SPORT ) )
         #infinite loop so that function do not terminate and thread do not end.
         while True:
             self.keepAliveTime =  getExecuteTime()
@@ -31,31 +34,71 @@ class keepAliveThread (threading.Thread):
                 # Listening for Keep Alive Status
                 try:
                     self.nextkeepAliveTime = self.keepAliveTime+KEEPALIVE_TIME_GAP
-                    print "SendHeartBeat"
-                    client.send ('HeartBeat')
+                    if(self.doneFlag == False):
+                        print "SendHeartBeat"
+                        client.send ('HeartBeat')
+                    else:
+                        print "Done"
+                        client.send ('Done')    
                    
                 except socket.error:
                     #came out of loop
                     print "Master is down!!!"
                     client.close()
                     break
-            
-def doIndexing():
-    keepAliveTime = getExecuteTime()
-    nextkeepAliveTime = keepAliveTime+KEEPALIVE_TIME_GAP
-    HeartBeatThread = keepAliveThread(keepAliveTime,nextkeepAliveTime)
-    HeartBeatThread.start()
-    while True:
-        keepAliveTime =  getExecuteTime()
-        if keepAliveTime >= nextkeepAliveTime:
-            nextkeepAliveTime = keepAliveTime+KEEPALIVE_TIME_GAP
-            print "test"
-            sys.stdout.flush()
+    def setDoneFlag(self,doneFlag):
+        self.doneFlag = doneFlag
+class DoIndexing (threading.Thread):
+    def __init__(self,conn,doneFlag):
+        threading.Thread.__init__(self)
+        self.conn = conn
+        self.doneFlag = doneFlag
+    def run(self):
+        # Connect to the server:
+        self.conn.close()
+        keepAliveTime = getExecuteTime()
+        nextkeepAliveTime = keepAliveTime+KEEPALIVE_TIME_GAP
+        HeartBeatThread = keepAliveThread(keepAliveTime,nextkeepAliveTime,self.doneFlag)
+        HeartBeatThread.start()
+        while keepAliveTime <= nextkeepAliveTime+4:
+            keepAliveTime = getExecuteTime()
+            #print "test"
+        HeartBeatThread.setDoneFlag(True)     
         
-
+            
+        
 
 if __name__ == '__main__':
     # Listen for master
-    p = Process(target=doIndexing, args=())
-    p.start()
-    p.join()
+    doneFlag = False
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    print 'Socket created'
+     
+    #Bind socket to local host and port
+    try:
+        s.bind((CHOST, CPORT))
+    except socket.error as msg:
+        print 'Bind failed. Error Code : ' + str(msg[0]) + ' Message ' + msg[1]
+        sys.exit()
+         
+    print 'Socket bind complete'
+     
+    #Start listening on socket
+    s.listen(5)
+    print 'Socket now listening'
+    while 1:
+        #wait to accept a connection - blocking call
+        conn, addr = s.accept()
+        print 'Connected with ' + addr[0] + ':' + str(addr[1])
+        #conn.settimeout(TIMEOUT)
+        #p = Process(target=doIndexing, args=(conn,))
+        #p.start()
+        #p.join()
+        
+        DoIndexingT = DoIndexing(conn,doneFlag)
+        # Start new Threads
+        DoIndexingT.start()
+        #DoIndexingT.join()
+       
+    s.close()
+   
