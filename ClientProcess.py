@@ -35,10 +35,10 @@ class keepAliveThread (threading.Thread):
                 try:
                     self.nextkeepAliveTime = self.keepAliveTime+KEEPALIVE_TIME_GAP
                     if(self.doneFlag == False):
-                        print "SendHeartBeat"
+                        print "keep-alive:indexing"
                         client.send ('HeartBeat')
                     else:
-                        print "Done"
+                        print "keep-alive:indexing-done"
                         client.send ('Done')    
                    
                 except socket.error:
@@ -55,6 +55,18 @@ class DoIndexing (threading.Thread):
         self.doneFlag = doneFlag
     def run(self):
         # Connect to the server:
+        # data = self.conn.recv(1024)
+        # self.conn.close()
+        # if data = "indexing"
+            # start Thread keepAliveThread(keep-alive:indexing)
+            # update StateDB every 5 seconds of its state and last indexed record
+            # call indexingMethod to do indexing 
+        # else if data = "writing"
+            # start Thread keepAliveThread(keep-alive:writing)
+            # update StateDB every 5 seconds of its state and last written record
+            # call writingMethod to do writing 
+        # HeartBeatThread.setDoneFlag(True)
+        
         self.conn.close()
         keepAliveTime = getExecuteTime()
         nextkeepAliveTime = keepAliveTime+KEEPALIVE_TIME_GAP
@@ -64,9 +76,7 @@ class DoIndexing (threading.Thread):
             keepAliveTime = getExecuteTime()
             #print "test"
         HeartBeatThread.setDoneFlag(True)     
-        
-            
-        
+                   
 
 if __name__ == '__main__':
     # Listen for master
@@ -90,11 +100,8 @@ if __name__ == '__main__':
         #wait to accept a connection - blocking call
         conn, addr = s.accept()
         print 'Connected with ' + addr[0] + ':' + str(addr[1])
-        #conn.settimeout(TIMEOUT)
-        #p = Process(target=doIndexing, args=(conn,))
-        #p.start()
-        #p.join()
         
+
         DoIndexingT = DoIndexing(conn,doneFlag)
         # Start new Threads
         DoIndexingT.start()
