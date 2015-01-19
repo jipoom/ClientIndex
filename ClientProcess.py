@@ -36,10 +36,10 @@ class keepAliveThread (threading.Thread):
                     self.nextkeepAliveTime = self.keepAliveTime+KEEPALIVE_TIME_GAP
                     if(self.doneFlag == False):
                         print "keep-alive:indexing"
-                        client.send ('HeartBeat')
+                        client.send ('keep-alive:indexingt')
                     else:
                         print "keep-alive:indexing-done"
-                        client.send ('Done')    
+                        client.send ('keep-alive:indexing-done')    
                    
                 except socket.error:
                     #came out of loop
