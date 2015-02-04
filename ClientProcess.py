@@ -48,15 +48,17 @@ class keepAliveThread (threading.Thread):
                     break
     def setDoneFlag(self,doneFlag):
         self.doneFlag = doneFlag
-class DoIndexing (threading.Thread):
+class HandleMsg (threading.Thread):
     def __init__(self,conn,doneFlag):
         threading.Thread.__init__(self)
         self.conn = conn
         self.doneFlag = doneFlag
     def run(self):
         # Connect to the server:
-        # data = self.conn.recv(1024)
-        # self.conn.close()
+        data = self.conn.recv(1024)
+        self.conn.close()
+        print data
+        # extract data to see 
         # if data = "indexing"
             # start Thread keepAliveThread(keep-alive:indexing)
             # update StateDB every 5 seconds of its state and last indexed record
@@ -102,9 +104,9 @@ if __name__ == '__main__':
         print 'Connected with ' + addr[0] + ':' + str(addr[1])
         
 
-        DoIndexingT = DoIndexing(conn,doneFlag)
+        HandleMsgThread = HandleMsg(conn,doneFlag)
         # Start new Threads
-        DoIndexingT.start()
+        HandleMsgThread.start()
         #DoIndexingT.join()
        
     s.close()
