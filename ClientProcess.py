@@ -230,6 +230,60 @@ def indexing(command):
     
 #--------- End of Indexing method
 
+#--------- Writing method
+def writing(command):
+    #connect to local DB
+    from pymongo import MongoClient
+    client = MongoClient("mongodb://127.0.0.1:2884")
+    #client = MongoClient()
+    db = client.logsearch
+    
+        # connect database and query parameter with id
+    from bson.objectid import ObjectId
+    collection = db.log_index
+    cursor_ = collection.find()
+    for cursor in cursor_:
+        service = cursor['service']
+        system = cursor['system']
+        node = cursor['node']
+        process = cursor['process']
+        file_path = cursor['path']
+        msisdn = re.compile(cursor['msisdn'])
+        index = re.compile(cursor['index'])
+        fullDateTime = cursor['datetime']
+        startTag = re.compile(cursor['startTag'])
+        endTag = re.compile(cursor['endTag'])
+        
+        #Write to actual DB
+        from pymongo import MongoClient
+        client2 = MongoClient("mongodb://10.235.36.32:2884")
+        #client = MongoClient()
+        db2 = client2.logsearch
+        collection2 = db2.log_index
+        collection2.insert({ "service": service,
+                          "system": system,
+                           "node": node,
+                        "process": process,
+                           "path": file_path,
+                           "msisdn": msisdn,
+                           "index": index,
+                           "datetime": fullDateTime,
+                           "startTag": startTag,
+                           "endTag": endTag })
+        
+        #remove a record
+        collection.remove({ "service": service,
+                          "system": system,
+                           "node": node,
+                        "process": process,
+                           "path": file_path,
+                           "msisdn": msisdn,
+                           "index": index,
+                           "datetime": fullDateTime,
+                           "startTag": startTag,
+                           "endTag": endTag })
+#--------- End of Writing method
+
 def getExecuteTime():
     now=datetime.datetime.now()
     return time.mktime(now.timetuple()) 
