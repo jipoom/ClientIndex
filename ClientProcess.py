@@ -1,15 +1,65 @@
-import socket, datetime, time, threading, sys
-#import lib from indexScript
-import glob,gzip,sys,timeit,re,os,datetime,urllib2,pymongo,errno
-
-from multiprocessing import Process
-
+import socket, time, threading, gzip,sys,re,os,datetime,errno
+from pymongo import MongoClient
+# CONSTANT
 KEEPALIVE_TIME_GAP = 2; #seconds
 SHOST = '127.0.0.1'   # Symbolic name meaning all available interfaces
 SPORT = 8888 # Arbitrary non-privileged port
 CHOST = '127.0.0.1'   # Symbolic name meaning all available interfaces
 CPORT = 9990 # Arbitrary non-privileged port
+LOCAL_DB = '192.168.0.213'
+LOCAL_PORT = 27017
+ACTUAL_DB = '10.235.36.32'
+ACTUAL_PORT = 2884
+STATE_DB = "192.168.0.213"
+STATE_DB_PORT = 27017
+
 now=datetime.datetime.now()
+
+def getlogfileFromLocalDB():
+    # Get last record from state DB
+    mongoClient = MongoClient(LOCAL_DB, LOCAL_PORT)
+    db = mongoClient.logsearch
+    logfileCollection = db.log_file
+    mongoClient.close()
+    # return log_file collection
+    return logfileCollection
+
+def getlogindexFromLocalDB():
+    # Get last record from state DB
+    mongoClient = MongoClient(LOCAL_DB, LOCAL_PORT)
+    db = mongoClient.logsearch
+    logindexCollection = db.log_index
+    mongoClient.close()
+    # return log_index collection
+    return logindexCollection
+
+def getlogindexFromActualDB():
+    # Get last record from state DB
+    mongoClient = MongoClient(ACTUAL_DB, ACTUAL_PORT)
+    db = mongoClient.logsearch
+    logindexCollection = db.log_index
+    mongoClient.close()
+    # return log_index collection
+    return logindexCollection
+
+def getlogindexFromOtherDB(IP):
+    # Get last record from state DB
+    mongoClient = MongoClient(IP, '27017')
+    db = mongoClient.logsearch
+    logindexCollection = db.log_index
+    mongoClient.close()
+    # return log_index collection
+    return logindexCollection
+
+def getRecordFromStateDB():
+    # Get last record from state DB
+    mongoClient = MongoClient(STATE_DB, STATE_DB_PORT)
+    db = mongoClient.logsearch
+    stateCollection = db.StateDB_state
+    mongoClient.close()
+    # return string containing jobID:state:last_record:node
+    print "getRecordStateDB"
+    return stateCollection
 
 #--------- From indexScript.py
 def mkdir_p(path):
@@ -38,9 +88,6 @@ def openLogFile():
 
 #--------- Indexing method
 def indexing(command):
-    from pymongo import MongoClient
-    client = MongoClient("mongodb://192.168.0.213:27017")
-    db = client.logsearch
     #======== index mode ============
     print "Start Indexing"
     job_id = command[1]
@@ -68,7 +115,7 @@ def indexing(command):
     if interval != "":
         find_cmd += ' -mmin +' + interval
     indexLogFile = openLogFile()
- ###################################################################
+###################################################################
     
     dateTimeFormat = dateFormat + ' ' + timeFormat
     
@@ -90,7 +137,7 @@ def indexing(command):
 #                print '{0:6}  {1:11}  {2:19}  {3:8}  {4:6}'.format('index', 'msisdn', 'datetime', 'startTag', 'endTag')
 #            else:
                 # check file already indexed?
-            collection = db.log_file
+            collection = getlogfileFromLocalDB()
             cursor = collection.find_one({"service":service, "system":system, "node":node, "process":process, "path":file_path})
             if cursor: # already indexed, skip
                 print file_path + ", This file is already indexed."
@@ -102,7 +149,7 @@ def indexing(command):
                 collection.insert({"service":service, "system":system, "node":node, "process":process, "path":file_path, "datetime":today})
                 
             
-            collection = db.log_index
+            collection = getlogindexFromLocalDB()
             if '.gz' in file_path:
                 fileContent = gzip.open(file_path,'r')
             else:
@@ -214,7 +261,10 @@ def indexing(command):
                         date = ''    #if date in log
                 #############################################################
                 
-    
+            if lineNumber%1000 ==0 :
+                state_collection = getRecordFromStateDB()
+                state_collection.update({'jobID': job_id}, {"$set": {'state': "indexing", 'lastDoneRecord':lineNumber}})
+                
             fileContent.close()
             # for index test, index a file then exit
 #            if mode == 'test':
@@ -232,56 +282,94 @@ def indexing(command):
 
 #--------- Writing method
 def writing(command):
-    #connect to local DB
-    from pymongo import MongoClient
-    client = MongoClient("mongodb://127.0.0.1:2884")
-    #client = MongoClient()
-    db = client.logsearch
+    cmd = command.split("##")
+    job_id = cmd[1]
+    dbcheck = cmd[2]
+    db_ip = cmd[3] 
     
+    if dbcheck == "<withoutDB>":
         # connect database and query parameter with id
-    from bson.objectid import ObjectId
-    collection = db.log_index
-    cursor_ = collection.find()
-    for cursor in cursor_:
-        service = cursor['service']
-        system = cursor['system']
-        node = cursor['node']
-        process = cursor['process']
-        file_path = cursor['path']
-        msisdn = re.compile(cursor['msisdn'])
-        index = re.compile(cursor['index'])
-        fullDateTime = cursor['datetime']
-        startTag = re.compile(cursor['startTag'])
-        endTag = re.compile(cursor['endTag'])
-        
-        #Write to actual DB
-        from pymongo import MongoClient
-        client2 = MongoClient("mongodb://10.235.36.32:2884")
-        #client = MongoClient()
-        db2 = client2.logsearch
-        collection2 = db2.log_index
-        collection2.insert({ "service": service,
-                          "system": system,
-                           "node": node,
-                        "process": process,
-                           "path": file_path,
-                           "msisdn": msisdn,
-                           "index": index,
-                           "datetime": fullDateTime,
-                           "startTag": startTag,
-                           "endTag": endTag })
-        
-        #remove a record
-        collection.remove({ "service": service,
-                          "system": system,
-                           "node": node,
-                        "process": process,
-                           "path": file_path,
-                           "msisdn": msisdn,
-                           "index": index,
-                           "datetime": fullDateTime,
-                           "startTag": startTag,
-                           "endTag": endTag })
+        local_collection = getlogindexFromLocalDB()
+        cursor_ = local_collection.find()
+        for cursor in cursor_:
+            service = cursor['service']
+            system = cursor['system']
+            node = cursor['node']
+            process = cursor['process']
+            file_path = cursor['path']
+            msisdn = re.compile(cursor['msisdn'])
+            index = re.compile(cursor['index'])
+            fullDateTime = cursor['datetime']
+            startTag = re.compile(cursor['startTag'])
+            endTag = re.compile(cursor['endTag'])
+            
+            acutal_collection = getlogindexFromActualDB()
+            acutal_collection.insert({ "service": service,
+                              "system": system,
+                               "node": node,
+                            "process": process,
+                               "path": file_path,
+                               "msisdn": msisdn,
+                               "index": index,
+                               "datetime": fullDateTime,
+                               "startTag": startTag,
+                               "endTag": endTag })
+            
+            #remove a record
+            local_collection.remove({ "service": service,
+                              "system": system,
+                               "node": node,
+                            "process": process,
+                               "path": file_path,
+                               "msisdn": msisdn,
+                               "index": index,
+                               "datetime": fullDateTime,
+                               "startTag": startTag,
+                               "endTag": endTag })
+            
+            state_collection = getRecordFromStateDB()
+            state_collection.update({'jobID': job_id}, {"$set": {'state': "writing", 'lastDoneRecord':""}})
+    elif dbcheck == "<withDB>":              
+        #Connect to Other database servers
+        db_collection = getlogindexFromOtherDB(db_ip)
+        cursor_ = db_collection.find()
+        for cursor in cursor_:
+            service = cursor['service']
+            system = cursor['system']
+            node = cursor['node']
+            process = cursor['process']
+            file_path = cursor['path']
+            msisdn = re.compile(cursor['msisdn'])
+            index = re.compile(cursor['index'])
+            fullDateTime = cursor['datetime']
+            startTag = re.compile(cursor['startTag'])
+            endTag = re.compile(cursor['endTag'])
+            
+            acutal_collection = getlogindexFromActualDB()
+            acutal_collection.insert({ "service": service,
+                              "system": system,
+                               "node": node,
+                            "process": process,
+                               "path": file_path,
+                               "msisdn": msisdn,
+                               "index": index,
+                               "datetime": fullDateTime,
+                               "startTag": startTag,
+                               "endTag": endTag })
+            
+            #remove a record
+            db_collection.remove({ "service": service,
+                              "system": system,
+                               "node": node,
+                            "process": process,
+                               "path": file_path,
+                               "msisdn": msisdn,
+                               "index": index,
+                               "datetime": fullDateTime,
+                               "startTag": startTag,
+                               "endTag": endTag })
+            state_collection = getRecordFromStateDB()
+            state_collection.update({'jobID': job_id}, {"$set": {'state': "writing", 'lastDoneRecord':""}})
 #--------- End of Writing method
 
 def getExecuteTime():
@@ -290,13 +378,14 @@ def getExecuteTime():
               
 
 class keepAliveThread (threading.Thread):
-    def __init__(self,keepAliveTime,nextkeepAliveTime,doneFlag,op):
+    def __init__(self,keepAliveTime,nextkeepAliveTime,doneFlag,op,jobid):
         self.process = None
         threading.Thread.__init__(self)
         self.keepAliveTime = keepAliveTime
         self.nextkeepAliveTime = nextkeepAliveTime
         self.doneFlag = doneFlag
         self.op = op
+        self.jobid = jobid
     def run(self):
         # Connect to the server:
        
@@ -312,18 +401,18 @@ class keepAliveThread (threading.Thread):
                     self.nextkeepAliveTime = self.keepAliveTime+KEEPALIVE_TIME_GAP
                     if(self.doneFlag == False):
                         if(self.op == "indexing"):
-                            print "keep-alive:indexing"
-                            client.send ('keep-alive:indexing')
+                            print self.jobid+"##indexing"
+                            client.send (self.jobid+'##indexing')
                         else:
-                            print "keep-alive:writing"
-                            client.send ('keep-alive:writing')
+                            print self.jobid+"##writing"
+                            client.send (self.jobid+'##writing')
                     else:
                         if(self.op == "indexing"):
-                            print "keep-alive:indexing-done"
-                            client.send ('keep-alive:indexing-done')  
+                            print self.jobid+"##indexing-done"
+                            client.send (self.jobid+'##indexing-done')  
                         else:  
-                            print "keep-alive:writing-done"
-                            client.send ('keep-alive:writing-done')                   
+                            print self.jobid+"##writing-done"
+                            client.send (self.jobid+'##writing-done')                   
                 except socket.error:
                     #came out of loop
                     print "Master is down!!!"
@@ -331,30 +420,30 @@ class keepAliveThread (threading.Thread):
                     break
     def setDoneFlag(self,doneFlag):
         self.doneFlag = doneFlag
+        
 class HandleMsg (threading.Thread):
     def __init__(self,doneFlag):
         threading.Thread.__init__(self)
-       # self.conn = conn
         self.doneFlag = doneFlag
     def run(self):
         # Connect to the server:
         #data = self.conn.recv(1024)
         #self.conn.close()
         #Test command from the master
-        data = "indexing##<job_id>##<service>##<system>##<node>##<process>\
+        data = "indexing##123##<service>##<system>##<node>##<process>\
         ##<path>##<log_type>##<logStartTag>##<logEndTag>##<msisdnRegex>\
         ##<dateHolder>##<dateRegex>##<dateFormat>##<timeRegex>\
         ##<timeFormat>##<mmin>##<interval>##LastDoneRecord=Line_num"
         # Split command
         cmd = data.split("##")
-        
+        jobid = cmd[1]
         # extract data to see 
         if cmd[0] == "indexing":
             # start Thread keepAliveThread(keep-alive:indexing)
             keepAliveTime = getExecuteTime()
             nextkeepAliveTime = keepAliveTime+KEEPALIVE_TIME_GAP
-            op="indexing"
-            HeartBeatThread = keepAliveThread(keepAliveTime,nextkeepAliveTime,self.doneFlag,op)
+            op="indexing"           
+            HeartBeatThread = keepAliveThread(keepAliveTime,nextkeepAliveTime,self.doneFlag,op,jobid)
             HeartBeatThread.start()
             while keepAliveTime <= nextkeepAliveTime+4:
                 keepAliveTime = getExecuteTime()
@@ -370,7 +459,7 @@ class HandleMsg (threading.Thread):
             keepAliveTime = getExecuteTime()
             nextkeepAliveTime = keepAliveTime+KEEPALIVE_TIME_GAP
             op="writing"
-            HeartBeatThread = keepAliveThread(keepAliveTime,nextkeepAliveTime,self.doneFlag,op)
+            HeartBeatThread = keepAliveThread(keepAliveTime,nextkeepAliveTime,self.doneFlag,op,jobid)
             HeartBeatThread.start()
             while keepAliveTime <= nextkeepAliveTime+4:
                 keepAliveTime = getExecuteTime()
@@ -378,7 +467,7 @@ class HandleMsg (threading.Thread):
             HeartBeatThread.setDoneFlag(True)
             # update StateDB every 5 seconds of its state and last written record
             # call writingMethod to do writing 
-            #writing(cmd)
+            writing(cmd)
         # HeartBeatThread.setDoneFlag(True)
         
 #        self.conn.close()
