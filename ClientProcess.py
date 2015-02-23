@@ -1,5 +1,6 @@
 import socket, time, threading, gzip,sys,re,os,datetime,errno
 from pymongo import MongoClient
+from xml.dom.minidom import DocumentType
 # CONSTANT
 KEEPALIVE_TIME_GAP = 2; #seconds
 SHOST = '127.0.0.1'   # Symbolic name meaning all available interfaces
@@ -16,7 +17,7 @@ STATE_DB_PORT = 27017
 now=datetime.datetime.now()
 
 def getlogfileFromLocalDB():
-    # Get last record from state DB
+    # Get log_file collection from Local DB
     mongoClient = MongoClient(LOCAL_DB, LOCAL_PORT)
     db = mongoClient.logsearch
     logfileCollection = db.log_file
@@ -25,7 +26,7 @@ def getlogfileFromLocalDB():
     return logfileCollection
 
 def getlogindexFromLocalDB():
-    # Get last record from state DB
+    # Get log_index collection from Local DB
     mongoClient = MongoClient(LOCAL_DB, LOCAL_PORT)
     db = mongoClient.logsearch
     logindexCollection = db.log_index
@@ -34,7 +35,7 @@ def getlogindexFromLocalDB():
     return logindexCollection
 
 def getlogindexFromActualDB():
-    # Get last record from state DB
+    # Get log_index collection from Actual DB
     mongoClient = MongoClient(ACTUAL_DB, ACTUAL_PORT)
     db = mongoClient.logsearch
     logindexCollection = db.log_index
@@ -43,7 +44,7 @@ def getlogindexFromActualDB():
     return logindexCollection
 
 def getlogindexFromOtherDB(IP):
-    # Get last record from state DB
+    # Get log_index collection from other DB
     mongoClient = MongoClient(IP, '27017')
     db = mongoClient.logsearch
     logindexCollection = db.log_index
@@ -51,9 +52,19 @@ def getlogindexFromOtherDB(IP):
     # return log_index collection
     return logindexCollection
 
-def getRecordFromStateDB():
+def getRecordFromStateDB(IP):
     # Get last record from state DB
-    mongoClient = MongoClient(STATE_DB, STATE_DB_PORT)
+    mongoClient = MongoClient(IP, STATE_DB_PORT)
+    db = mongoClient.logsearch
+    stateCollection = db.StateDB_state
+    mongoClient.close()
+    # return string containing jobID:state:last_record:node
+    print "getRecordStateDB"
+    return stateCollection
+
+def getRecordFromLocalStateDB():
+    # Get last record from state DB
+    mongoClient = MongoClient(LOCAL_DB, LOCAL_PORT)
     db = mongoClient.logsearch
     stateCollection = db.StateDB_state
     mongoClient.close()
@@ -88,26 +99,34 @@ def openLogFile():
 
 #--------- Indexing method
 def indexing(command):
+    """
+    indexing##<job_id>## <state_db_ip> ##<service>##<system>##<node>##<process
+    >##<path>##<log_type>##<logStartTag>##<logEndTag>##<msisdnRegex>##<dat
+    eHolder>##<dateRegex>##<dateFormat>##<timeRegex>##<timeFormat>##<mmin
+    >##<interval>## lastIndexedFile ##LastDoneRecord=Line_num
+    """
     #======== index mode ============
     print "Start Indexing"
     job_id = command[1]
-    service = command[2]
-    system = command[3]
-    node = command[4]
-    process = command[5]
-    logPath = command[6]
-    logType = command[7]
-    logStartTag = command[8]
-    logEndTag = command[9]
-    msisdnRegex = command[10]
-    dateHolder = command[11]
-    dateRegex = command[12]
-    dateFormat = command[13]
-    timeRegex = command[14]
-    timeFormat = command[15]
-    mmin = command[16]
-    interval = command[17]
-    LastDoneRecord = command[18]
+    state_db_ip = command[2]
+    service = command[3]
+    system = command[4]
+    node = command[5]
+    process = command[6]
+    logPath = command[7]
+    logType = command[8]
+    logStartTag = command[9]
+    logEndTag = command[10]
+    msisdnRegex = command[11]
+    dateHolder = command[12]
+    dateRegex = command[13]
+    dateFormat = command[14]
+    timeRegex = command[15]
+    timeFormat = command[16]
+    mmin = command[17]
+    interval = command[18]
+    lastIndexedFile = command[19]
+    LastDoneRecord = command[20]
         # generate find command
     find_cmd = 'find ' + logPath + ' -type f'
     if mmin != "":
@@ -262,9 +281,18 @@ def indexing(command):
                 #############################################################
                 
             if lineNumber%1000 ==0 :
-                state_collection = getRecordFromStateDB()
-                state_collection.update({'jobID': job_id}, {"$set": {'state': "indexing", 'lastDoneRecord':lineNumber}})
-                
+                state_collection = getRecordFromStateDB(state_db_ip)
+                state_collection.update({'jobID': job_id}, {"$set": {'state': "indexing", 'lastFileName':file,
+                                                                     'lastDoneRecord':lineNumber,'db_ip':"192.168.0.213"}})
+                Localstate_collection = getRecordFromLocalStateDB()
+                document = {
+                            'jobID':job_id,
+                            'state':"indexing",
+                            'lastFileName':file,
+                            'lastDoneRecord':lineNumber,
+                            'db_ip':"192.168.0.213"
+                            }
+                Localstate_collection.insert(document)                           
             fileContent.close()
             # for index test, index a file then exit
 #            if mode == 'test':
@@ -282,94 +310,65 @@ def indexing(command):
 
 #--------- Writing method
 def writing(command):
+    """writing##<job_id>##<state_db_ip>##<main_db_ip>##<db_ip>##lastDoneRecord"""
+    
     cmd = command.split("##")
     job_id = cmd[1]
-    dbcheck = cmd[2]
-    db_ip = cmd[3] 
-    
-    if dbcheck == "<withoutDB>":
-        # connect database and query parameter with id
-        local_collection = getlogindexFromLocalDB()
-        cursor_ = local_collection.find()
-        for cursor in cursor_:
-            service = cursor['service']
-            system = cursor['system']
-            node = cursor['node']
-            process = cursor['process']
-            file_path = cursor['path']
-            msisdn = re.compile(cursor['msisdn'])
-            index = re.compile(cursor['index'])
-            fullDateTime = cursor['datetime']
-            startTag = re.compile(cursor['startTag'])
-            endTag = re.compile(cursor['endTag'])
-            
-            acutal_collection = getlogindexFromActualDB()
-            acutal_collection.insert({ "service": service,
-                              "system": system,
-                               "node": node,
-                            "process": process,
-                               "path": file_path,
-                               "msisdn": msisdn,
-                               "index": index,
-                               "datetime": fullDateTime,
-                               "startTag": startTag,
-                               "endTag": endTag })
-            
-            #remove a record
-            local_collection.remove({ "service": service,
-                              "system": system,
-                               "node": node,
-                            "process": process,
-                               "path": file_path,
-                               "msisdn": msisdn,
-                               "index": index,
-                               "datetime": fullDateTime,
-                               "startTag": startTag,
-                               "endTag": endTag })
-            
-            state_collection = getRecordFromStateDB()
-            state_collection.update({'jobID': job_id}, {"$set": {'state': "writing", 'lastDoneRecord':""}})
-    elif dbcheck == "<withDB>":              
-        #Connect to Other database servers
-        db_collection = getlogindexFromOtherDB(db_ip)
-        cursor_ = db_collection.find()
-        for cursor in cursor_:
-            service = cursor['service']
-            system = cursor['system']
-            node = cursor['node']
-            process = cursor['process']
-            file_path = cursor['path']
-            msisdn = re.compile(cursor['msisdn'])
-            index = re.compile(cursor['index'])
-            fullDateTime = cursor['datetime']
-            startTag = re.compile(cursor['startTag'])
-            endTag = re.compile(cursor['endTag'])
-            
-            acutal_collection = getlogindexFromActualDB()
-            acutal_collection.insert({ "service": service,
-                              "system": system,
-                               "node": node,
-                            "process": process,
-                               "path": file_path,
-                               "msisdn": msisdn,
-                               "index": index,
-                               "datetime": fullDateTime,
-                               "startTag": startTag,
-                               "endTag": endTag })
-            
-            #remove a record
-            db_collection.remove({ "service": service,
-                              "system": system,
-                               "node": node,
-                            "process": process,
-                               "path": file_path,
-                               "msisdn": msisdn,
-                               "index": index,
-                               "datetime": fullDateTime,
-                               "startTag": startTag,
-                               "endTag": endTag })
-            state_collection = getRecordFromStateDB()
-            state_collection.update({'jobID': job_id}, {"$set": {'state': "writing", 'lastDoneRecord':""}})
+    state_db_ip = cmd[2]
+    main_db_ip = cmd[3]
+    db_ip = cmd[4] 
+                
+    #Connect to Other database servers
+    db_collection = getlogindexFromOtherDB(db_ip)
+    cursor_ = db_collection.find()
+    for cursor in cursor_:
+        service = cursor['service']
+        system = cursor['system']
+        node = cursor['node']
+        process = cursor['process']
+        file_path = cursor['path']
+        msisdn = re.compile(cursor['msisdn'])
+        index = re.compile(cursor['index'])
+        fullDateTime = cursor['datetime']
+        startTag = re.compile(cursor['startTag'])
+        endTag = re.compile(cursor['endTag'])
+        
+        acutal_collection = getlogindexFromOtherDB(main_db_ip)
+        acutal_collection.insert({ "service": service,
+                          "system": system,
+                           "node": node,
+                        "process": process,
+                           "path": file_path,
+                           "msisdn": msisdn,
+                           "index": index,
+                           "datetime": fullDateTime,
+                           "startTag": startTag,
+                           "endTag": endTag })
+        
+        #remove a record
+        db_collection.remove({ "service": service,
+                          "system": system,
+                           "node": node,
+                        "process": process,
+                           "path": file_path,
+                           "msisdn": msisdn,
+                           "index": index,
+                           "datetime": fullDateTime,
+                           "startTag": startTag,
+                           "endTag": endTag })
+        
+        state_collection = getRecordFromStateDB(state_db_ip)
+        state_collection.update({'jobID': job_id}, {"$set": {'state': "writing", 'lastDoneRecord':""}})
+        
+        Localstate_collection = getRecordFromLocalStateDB()
+        document = {
+                    'jobID':job_id,
+                    'state':"writing",
+                    'lastFileName':"",
+                    'lastDoneRecord':"",
+                    'db_ip':"192.168.0.213"
+                    }
+        Localstate_collection.insert(document)   
 #--------- End of Writing method
 
 def getExecuteTime():
@@ -430,10 +429,10 @@ class HandleMsg (threading.Thread):
         #data = self.conn.recv(1024)
         #self.conn.close()
         #Test command from the master
-        data = "indexing##123##<service>##<system>##<node>##<process>\
-        ##<path>##<log_type>##<logStartTag>##<logEndTag>##<msisdnRegex>\
-        ##<dateHolder>##<dateRegex>##<dateFormat>##<timeRegex>\
-        ##<timeFormat>##<mmin>##<interval>##LastDoneRecord=Line_num"
+        data = "indexing##12345## <state_db_ip> ##<service>##<system>##<node>##<process\
+                >##<path>##<log_type>##<logStartTag>##<logEndTag>##<msisdnRegex>##<dat\
+                eHolder>##<dateRegex>##<dateFormat>##<timeRegex>##<timeFormat>##<mmin\
+                >##<interval>## lastIndexedFile ##LastDoneRecord=Line_num"
         # Split command
         cmd = data.split("##")
         jobid = cmd[1]
