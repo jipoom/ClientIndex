@@ -13,8 +13,16 @@ ACTUAL_DB = '10.235.36.32'
 ACTUAL_PORT = 2884
 STATE_DB = "192.168.0.213"
 STATE_DB_PORT = 27017
+LOCAL_IP = ''
 
 now=datetime.datetime.now()
+
+def getLocalIP(s):
+    try:
+        client = s.getsockname()[0]
+    except socket.error:
+        client = "Unknown IP"
+    return client
 
 def getlogfileFromLocalDB():
     # Get log_file collection from Local DB
@@ -52,19 +60,9 @@ def getlogindexFromOtherDB(IP):
     # return log_index collection
     return logindexCollection
 
-def getRecordFromStateDB(IP):
+def getRecordFromStateDB(IP,PORT):
     # Get last record from state DB
     mongoClient = MongoClient(IP, STATE_DB_PORT)
-    db = mongoClient.logsearch
-    stateCollection = db.StateDB_state
-    mongoClient.close()
-    # return string containing jobID:state:last_record:node
-    print "getRecordStateDB"
-    return stateCollection
-
-def getRecordFromLocalStateDB():
-    # Get last record from state DB
-    mongoClient = MongoClient(LOCAL_DB, LOCAL_PORT)
     db = mongoClient.logsearch
     stateCollection = db.StateDB_state
     mongoClient.close()
@@ -100,7 +98,7 @@ def openLogFile():
 #--------- Indexing method
 def indexing(command):
     """
-    indexing##<job_id>## <state_db_ip> ##<service>##<system>##<node>##<process
+    indexing##<job_id>## <state_db_ip:PORT> ##<service>##<system>##<node>##<process
     >##<path>##<log_type>##<logStartTag>##<logEndTag>##<msisdnRegex>##<dat
     eHolder>##<dateRegex>##<dateFormat>##<timeRegex>##<timeFormat>##<mmin
     >##<interval>## lastIndexedFile ##LastDoneRecord=Line_num
@@ -108,7 +106,8 @@ def indexing(command):
     #======== index mode ============
     print "Start Indexing"
     job_id = command[1]
-    state_db_ip = command[2]
+    state_db_ip = (command[2].split(":"))[0]
+    state_db_port = (command[2].split(":"))[1]
     service = command[3]
     system = command[4]
     node = command[5]
@@ -167,7 +166,6 @@ def indexing(command):
                 indexLogFile.write( today + " Index " + file_path + " , This file is not already indexed\n")
                 collection.insert({"service":service, "system":system, "node":node, "process":process, "path":file_path, "datetime":today})
                 
-            
             collection = getlogindexFromLocalDB()
             if '.gz' in file_path:
                 fileContent = gzip.open(file_path,'r')
@@ -197,6 +195,12 @@ def indexing(command):
     
             for line in fileContent:
                 lineNumber += 1
+                
+                # To resume unfinished job
+                # Check the file name and set line number
+                if lastIndexedFile in file :
+                    lineNumber = LastDoneRecord
+                    
                 if showRecord == 110: # in test mode exit when already show 110 indexs
                     sys.exit(1)
                 #############################
@@ -281,18 +285,9 @@ def indexing(command):
                 #############################################################
                 
             if lineNumber%1000 ==0 :
-                state_collection = getRecordFromStateDB(state_db_ip)
+                state_collection = getRecordFromStateDB(state_db_ip,state_db_port)
                 state_collection.update({'jobID': job_id}, {"$set": {'state': "indexing", 'lastFileName':file,
-                                                                     'lastDoneRecord':lineNumber,'db_ip':"192.168.0.213"}})
-                Localstate_collection = getRecordFromLocalStateDB()
-                document = {
-                            'jobID':job_id,
-                            'state':"indexing",
-                            'lastFileName':file,
-                            'lastDoneRecord':lineNumber,
-                            'db_ip':"192.168.0.213"
-                            }
-                Localstate_collection.insert(document)                           
+                                                                     'lastDoneRecord':lineNumber,'db_ip':LOCAL_IP}})                       
             fileContent.close()
             # for index test, index a file then exit
 #            if mode == 'test':
@@ -310,18 +305,20 @@ def indexing(command):
 
 #--------- Writing method
 def writing(command):
-    """writing##<job_id>##<state_db_ip>##<main_db_ip>##<db_ip>##lastDoneRecord"""
+    """writing##<job_id>##<state_db_ip:PORT>##<main_db_ip>##<db_ip>##lastDoneRecord"""
     
     cmd = command.split("##")
     job_id = cmd[1]
-    state_db_ip = cmd[2]
+    state_db_ip = (command[2].split(":"))[0]
+    state_db_port = (command[2].split(":"))[1]
     main_db_ip = cmd[3]
     db_ip = cmd[4] 
-                
+    i = 0            
     #Connect to Other database servers
     db_collection = getlogindexFromOtherDB(db_ip)
     cursor_ = db_collection.find()
     for cursor in cursor_:
+        i = i+1
         service = cursor['service']
         system = cursor['system']
         node = cursor['node']
@@ -357,18 +354,9 @@ def writing(command):
                            "startTag": startTag,
                            "endTag": endTag })
         
-        state_collection = getRecordFromStateDB(state_db_ip)
-        state_collection.update({'jobID': job_id}, {"$set": {'state': "writing", 'lastDoneRecord':""}})
-        
-        Localstate_collection = getRecordFromLocalStateDB()
-        document = {
-                    'jobID':job_id,
-                    'state':"writing",
-                    'lastFileName':"",
-                    'lastDoneRecord':"",
-                    'db_ip':"192.168.0.213"
-                    }
-        Localstate_collection.insert(document)   
+        state_collection = getRecordFromStateDB(state_db_ip,state_db_port)
+        state_collection.update({'jobID': job_id}, {"$set": {'state': "writing", 'lastDoneRecord':i}})
+           
 #--------- End of Writing method
 
 def getExecuteTime():
@@ -390,6 +378,8 @@ class keepAliveThread (threading.Thread):
        
         client = socket.socket ( socket.AF_INET, socket.SOCK_STREAM )
         client.connect ( ( SHOST, SPORT ) )
+        LOCAL_IP = getLocalIP(client)
+
         #infinite loop so that function do not terminate and thread do not end.
         while True:
             self.keepAliveTime =  getExecuteTime()
@@ -429,7 +419,7 @@ class HandleMsg (threading.Thread):
         #data = self.conn.recv(1024)
         #self.conn.close()
         #Test command from the master
-        data = "indexing##12345## <state_db_ip> ##<service>##<system>##<node>##<process\
+        data = "indexing##12345## <state_db_ip:123> ##<service>##<system>##<node>##<process\
                 >##<path>##<log_type>##<logStartTag>##<logEndTag>##<msisdnRegex>##<dat\
                 eHolder>##<dateRegex>##<dateFormat>##<timeRegex>##<timeFormat>##<mmin\
                 >##<interval>## lastIndexedFile ##LastDoneRecord=Line_num"
