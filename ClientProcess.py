@@ -51,9 +51,9 @@ def getlogindexFromActualDB():
     # return log_index collection
     return logindexCollection
 
-def getlogindexFromOtherDB(IP):
+def getlogindexFromOtherDB(IP,PORT):
     # Get log_index collection from other DB
-    mongoClient = MongoClient(IP, '27017')
+    mongoClient = MongoClient(IP, PORT)
     db = mongoClient.logsearch
     logindexCollection = db.log_index
     mongoClient.close()
@@ -145,7 +145,7 @@ def indexing(command):
     
     for file in files:
         try:
-            today = datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S')
+#          today = datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S')
             #########################
             ## read file from path ##
             ###############################################
@@ -155,16 +155,16 @@ def indexing(command):
 #                print '{0:6}  {1:11}  {2:19}  {3:8}  {4:6}'.format('index', 'msisdn', 'datetime', 'startTag', 'endTag')
 #            else:
                 # check file already indexed?
-            collection = getlogfileFromLocalDB()
-            cursor = collection.find_one({"service":service, "system":system, "node":node, "process":process, "path":file_path})
-            if cursor: # already indexed, skip
-                print file_path + ", This file is already indexed."
-                indexLogFile.write( today + " Skip " + file_path + " , This file is already indexed\n")
-                continue
-            else: # not indexed add path and date to database
-                print file_path + ", This file not already indexed."
-                indexLogFile.write( today + " Index " + file_path + " , This file is not already indexed\n")
-                collection.insert({"service":service, "system":system, "node":node, "process":process, "path":file_path, "datetime":today})
+#            collection = getlogfileFromLocalDB()
+#            cursor = collection.find_one({"service":service, "system":system, "node":node, "process":process, "path":file_path})
+#            if cursor: # already indexed, skip
+#                print file_path + ", This file is already indexed."
+#                indexLogFile.write( today + " Skip " + file_path + " , This file is already indexed\n")
+#                continue
+#            else: # not indexed add path and date to database
+#                print file_path + ", This file not already indexed."
+#                indexLogFile.write( today + " Index " + file_path + " , This file is not already indexed\n")
+#                collection.insert({"service":service, "system":system, "node":node, "process":process, "path":file_path, "datetime":today})
                 
             collection = getlogindexFromLocalDB()
             if '.gz' in file_path:
@@ -244,7 +244,8 @@ def indexing(command):
                                                    "index": index,
                                                    "datetime": fullDateTime,
                                                    "startTag": startTag,
-                                                   "endTag": endTag })
+                                                   "endTag": endTag,
+                                                   "job_id" : job_id })
                         # clear variable when found end tag
                         msisdn = ''
                         time = ''
@@ -276,7 +277,8 @@ def indexing(command):
                                                "index": index,
                                                "datetime": fullDateTime,
                                                "startTag": index,
-                                               "endTag": index })
+                                               "endTag": index,
+                                               "job_id" : job_id })
                     #clear variable every line
                     msisdn = ''
                     time = ''
@@ -305,17 +307,19 @@ def indexing(command):
 
 #--------- Writing method
 def writing(command):
-    """writing##<job_id>##<state_db_ip:PORT>##<main_db_ip>##<db_ip>##lastDoneRecord"""
+    """writing##<job_id>##<state_db_ip:state_db_port>##<main_db_ip:main_db_port>##<db_ip:db_port>##lastDoneRecord"""
     
     cmd = command.split("##")
     job_id = cmd[1]
     state_db_ip = (command[2].split(":"))[0]
     state_db_port = (command[2].split(":"))[1]
-    main_db_ip = cmd[3]
-    db_ip = cmd[4] 
+    main_db_ip = (command[3].split(":"))[0]
+    main_db_port = (command[3].split(":"))[1]
+    db_ip = (command[4].split(":"))[0] 
+    db_port = (command[4].split(":"))[1]
     i = 0            
     #Connect to Other database servers
-    db_collection = getlogindexFromOtherDB(db_ip)
+    db_collection = getlogindexFromOtherDB(db_ip,db_port)
     cursor_ = db_collection.find()
     for cursor in cursor_:
         i = i+1
@@ -330,7 +334,7 @@ def writing(command):
         startTag = re.compile(cursor['startTag'])
         endTag = re.compile(cursor['endTag'])
         
-        acutal_collection = getlogindexFromOtherDB(main_db_ip)
+        acutal_collection = getlogindexFromOtherDB(main_db_ip,main_db_port)
         acutal_collection.insert({ "service": service,
                           "system": system,
                            "node": node,
@@ -340,7 +344,8 @@ def writing(command):
                            "index": index,
                            "datetime": fullDateTime,
                            "startTag": startTag,
-                           "endTag": endTag })
+                           "endTag": endTag,
+                           "job_id" : job_id })
         
         #remove a record
         db_collection.remove({ "service": service,
@@ -352,7 +357,8 @@ def writing(command):
                            "index": index,
                            "datetime": fullDateTime,
                            "startTag": startTag,
-                           "endTag": endTag })
+                           "endTag": endTag,
+                           "job_id" : job_id })
         
         state_collection = getRecordFromStateDB(state_db_ip,state_db_port)
         state_collection.update({'jobID': job_id}, {"$set": {'state': "writing", 'lastDoneRecord':i}})
