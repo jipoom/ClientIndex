@@ -105,28 +105,49 @@ def indexing(command):
     """
     #======== index mode ============
     print "Start Indexing"
-    job_id = command[1]
-    state_db_ip = (command[2].split(":"))[0]
-    state_db_port = (command[2].split(":"))[1]
-    service = command[3]
-    system = command[4]
-    node = command[5]
-    process = command[6]
-    logPath = command[7]
-    logType = command[8]
-    logStartTag = command[9]
-    logEndTag = command[10]
-    msisdnRegex = command[11]
-    dateHolder = command[12]
-    dateRegex = command[13]
-    dateFormat = command[14]
-    timeRegex = command[15]
-    timeFormat = command[16]
-    mmin = command[17]
-    interval = command[18]
-    lastIndexedFile = command[19]
-    LastDoneRecord = command[20]
-        # generate find command
+    if(command[8] == "singleLine"):
+        job_id = command[1]
+        state_db_ip = (command[2].split(":"))[0]
+        state_db_port = (command[2].split(":"))[1]
+        service = command[3]
+        system = command[4]
+        node = command[5]
+        process = command[6]
+        logPath = command[7]
+        logType = command[8]
+        msisdnRegex = command[9]
+        dateHolder = command[10]
+        dateRegex = command[11]
+        dateFormat = command[12]
+        timeRegex = command[13]
+        timeFormat = command[14]
+        mmin = command[15]
+        interval = command[16]
+        lastIndexedFile = command[17]
+        LastDoneRecord = command[18]
+    elif(command[8] == "multiLine"):
+        job_id = command[1]
+        state_db_ip = (command[2].split(":"))[0]
+        state_db_port = (command[2].split(":"))[1]
+        service = command[3]
+        system = command[4]
+        node = command[5]
+        process = command[6]
+        logPath = command[7]
+        logType = command[8]
+        logStartTag = command[9]
+        logEndTag = command[10]
+        msisdnRegex = command[11]
+        dateHolder = command[12]
+        dateRegex = command[13]
+        dateFormat = command[14]
+        timeRegex = command[15]
+        timeFormat = command[16]
+        mmin = command[17]
+        interval = command[18]
+        lastIndexedFile = command[19]
+        LastDoneRecord = command[20]
+    # generate find command
     find_cmd = 'find ' + logPath + ' -type f'
     if mmin != "":
         find_cmd += ' -mmin -' + mmin
@@ -417,19 +438,21 @@ class keepAliveThread (threading.Thread):
         self.doneFlag = doneFlag
         
 class HandleMsg (threading.Thread):
-    def __init__(self,doneFlag):
+    def __init__(self,conn,doneFlag):
         threading.Thread.__init__(self)
         self.doneFlag = doneFlag
+        self.conn = conn
     def run(self):
         # Connect to the server:
-        #data = self.conn.recv(1024)
-        #self.conn.close()
+        data =  self.conn.recv(1024)
+        self.conn.close()
         #Test command from the master
-        data = "indexing##12345## <state_db_ip:123> ##<service>##<system>##<node>##<process\
-                >##<path>##<log_type>##<logStartTag>##<logEndTag>##<msisdnRegex>##<dat\
-                eHolder>##<dateRegex>##<dateFormat>##<timeRegex>##<timeFormat>##<mmin\
-                >##<interval>## lastIndexedFile ##LastDoneRecord=Line_num"
+        #data = "indexing##12345## <state_db_ip:123> ##<service>##<system>##<node>##<process\
+        #        >##<path>##<log_type>##<logStartTag>##<logEndTag>##<msisdnRegex>##<dat\
+        #        eHolder>##<dateRegex>##<dateFormat>##<timeRegex>##<timeFormat>##<mmin\
+        #        >##<interval>## lastIndexedFile ##LastDoneRecord=Line_num"
         # Split command
+        print data
         cmd = data.split("##")
         jobid = cmd[1]
         # extract data to see 
@@ -440,14 +463,15 @@ class HandleMsg (threading.Thread):
             op="indexing"           
             HeartBeatThread = keepAliveThread(keepAliveTime,nextkeepAliveTime,self.doneFlag,op,jobid)
             HeartBeatThread.start()
-            while keepAliveTime <= nextkeepAliveTime+4:
-                keepAliveTime = getExecuteTime()
+            # while keepAliveTime <= nextkeepAliveTime+10:
+            #    keepAliveTime = getExecuteTime()
             #print "test"
-            HeartBeatThread.setDoneFlag(True)  
+            
             # update StateDB every 5 seconds of its state and last indexed record
             
             # call indexingMethod to do indexing 
             indexing(cmd)
+            HeartBeatThread.setDoneFlag(True)  
         elif cmd[0] == "writing":
             print "writing"
             # start Thread keepAliveThread(keep-alive:writing)
@@ -456,13 +480,13 @@ class HandleMsg (threading.Thread):
             op="writing"
             HeartBeatThread = keepAliveThread(keepAliveTime,nextkeepAliveTime,self.doneFlag,op,jobid)
             HeartBeatThread.start()
-            while keepAliveTime <= nextkeepAliveTime+4:
-                keepAliveTime = getExecuteTime()
-            #print "test"
-            HeartBeatThread.setDoneFlag(True)
+            #while keepAliveTime <= nextkeepAliveTime+10:
+            #    keepAliveTime = getExecuteTime()
+            # print "test"
             # update StateDB every 5 seconds of its state and last written record
             # call writingMethod to do writing 
             writing(cmd)
+            HeartBeatThread.setDoneFlag(True)
         # HeartBeatThread.setDoneFlag(True)
         
 #        self.conn.close()
@@ -471,36 +495,34 @@ class HandleMsg (threading.Thread):
 
 if __name__ == '__main__':
 
-#    # Listen for master
-#    doneFlag = False
-#    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-#    print 'Socket created'
+    # Listen for master
+    doneFlag = False
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    print 'Socket created'
      
     #Bind socket to local host and port
-#    try:
-#        s.bind((CHOST, CPORT))
-#    except socket.error as msg:
-#        print 'Bind failed. Error Code : ' + str(msg[0]) + ' Message ' + msg[1]
-#        sys.exit()
+    try:
+        s.bind((CHOST, CPORT))
+    except socket.error as msg:
+        print 'Bind failed. Error Code : ' + str(msg[0]) + ' Message ' + msg[1]
+        sys.exit()
          
-#    print 'Socket bind complete'
+    print 'Socket bind complete'
      
     #Start listening on socket
-#   s.listen(5)
-#   print 'Socket now listening'
+    s.listen(5)
+    print 'Socket now listening'
                 
-#    while 1:
+    while 1:
         #wait to accept a connection - blocking call
-#        conn, addr = s.accept()
-#        print 'Connected with ' + addr[0] + ':' + str(addr[1])
+        conn, addr = s.accept()
+        print 'Connected with ' + addr[0] + ':' + str(addr[1])
         
-
         #HandleMsgThread = HandleMsg(conn,doneFlag)
-        doneFlag = False
-        HandleMsgThread = HandleMsg(doneFlag)
+        HandleMsgThread = HandleMsg(conn, doneFlag)
         # Start new Threads
         HandleMsgThread.start()
         #DoIndexingT.join()
        
-#    s.close()
+    s.close()
    
