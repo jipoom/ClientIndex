@@ -333,11 +333,11 @@ def writing(command):
     #cmd = command.split("##")
     job_id = command[1]
     state_db_ip = (command[2].split(":"))[0]
-    state_db_port = (command[2].split(":"))[1]
+    state_db_port = int((command[2].split(":"))[1])
     main_db_ip = (command[3].split(":"))[0]
-    main_db_port = (command[3].split(":"))[1]
+    main_db_port = int((command[3].split(":"))[1])
     db_ip = (command[4].split(":"))[0] 
-    db_port = (command[4].split(":"))[1]
+    db_port = int((command[4].split(":"))[1])
     i = 0            
     #Connect to Other database servers
     db_collection = getlogindexFromOtherDB(db_ip,db_port)
