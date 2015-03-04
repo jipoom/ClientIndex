@@ -343,7 +343,6 @@ def indexing(command):
                 indexLogFile.close()
                 HeartBeatThread.setDoneFlag(True)
     except:
-        time.sleep(2)
         e = sys.exc_info()[0]
         HeartBeatThread.setStopFlag(True)
         print( "<p>Error: %s</p>" % e )
