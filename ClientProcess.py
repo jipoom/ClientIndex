@@ -383,7 +383,8 @@ def writing(command):
     state_collection.insert({ "jobID": job_id,
                           "state": "writing",
                            "lastDonefile": "",
-                           "lastDoneRecord": 0
+                           "lastDoneRecord": 0,
+                           "db_ip": db_ip
                            }) 
         
     #Connect to Other database servers
