@@ -330,8 +330,8 @@ def indexing(command):
 def writing(command):
     """writing##<job_id>##<state_db_ip:state_db_port>##<main_db_ip:main_db_port>##<db_ip:db_port>##lastDoneRecord"""
     
-    cmd = command.split("##")
-    job_id = cmd[1]
+    #cmd = command.split("##")
+    job_id = command[1]
     state_db_ip = (command[2].split(":"))[0]
     state_db_port = (command[2].split(":"))[1]
     main_db_ip = (command[3].split(":"))[0]
