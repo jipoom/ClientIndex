@@ -325,7 +325,7 @@ def indexing(command):
                     state_collection.insert({ "jobID": job_id,
                           "state": "indexing",
                            "lastFileName": file,
-                           "lastDoneRecord": "0",
+                           "lastDoneRecord": 0,
                            "db_ip": LOCAL_IP
                            }) 
                                           
