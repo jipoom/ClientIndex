@@ -103,6 +103,15 @@ def indexing(command):
     eHolder>##<dateRegex>##<dateFormat>##<timeRegex>##<timeFormat>##<mmin
     >##<interval>## lastIndexedFile ##LastDoneRecord=Line_num
     """
+    
+    # start Thread keepAliveThread(keep-alive:indexing)
+    keepAliveTime = getExecuteTime()
+    nextkeepAliveTime = keepAliveTime+KEEPALIVE_TIME_GAP
+    op="indexing"           
+    HeartBeatThread = keepAliveThread(keepAliveTime,nextkeepAliveTime,False,False,op,command[1])
+    HeartBeatThread.start()
+    #HeartBeatThread.setDoneFlag(True)
+    #HeartBeatThread.setStopFlag(True)
     #======== index mode ============
     print "Start Indexing"
     if(command[8] == "singleLine"):
@@ -309,8 +318,17 @@ def indexing(command):
                 
             if lineNumber%1000 ==0 :
                 state_collection = getRecordFromStateDB(state_db_ip,state_db_port)
-                state_collection.update({'jobID': job_id}, {"$set": {'state': "indexing", 'lastFileName':file,
-                                                                     'lastDoneRecord':lineNumber,'db_ip':LOCAL_IP}})                       
+                if state_collection.find({'jobID': job_id}).count > 0:
+                    state_collection.update({'jobID': job_id}, {"$set": {'state': "indexing", 'lastFileName':file,
+                                                                     'lastDoneRecord':lineNumber,'db_ip':LOCAL_IP}}) 
+                else:
+                    state_collection.insert({ "jobID": job_id,
+                          "state": "indexing",
+                           "lastFileName": file,
+                           "lastDoneRecord": "0",
+                           "db_ip": LOCAL_IP
+                           }) 
+                                          
             fileContent.close()
             # for index test, index a file then exit
 #            if mode == 'test':
@@ -330,6 +348,14 @@ def indexing(command):
 def writing(command):
     """writing##<job_id>##<state_db_ip:state_db_port>##<main_db_ip:main_db_port>##<db_ip:db_port>##lastDoneRecord"""
     
+    # start Thread keepAliveThread(keep-alive:writing)
+    keepAliveTime = getExecuteTime()
+    nextkeepAliveTime = keepAliveTime+KEEPALIVE_TIME_GAP
+    op="writing"
+    HeartBeatThread = keepAliveThread(keepAliveTime,nextkeepAliveTime,False,False,op,command[1])
+    HeartBeatThread.start()    
+    #HeartBeatThread.setDoneFlag(True)
+    #HeartBeatThread.setStopFlag(True)
     #cmd = command.split("##")
     job_id = command[1]
     state_db_ip = (command[2].split(":"))[0]
@@ -382,7 +408,14 @@ def writing(command):
                            "job_id" : job_id })
         
         state_collection = getRecordFromStateDB(state_db_ip,state_db_port)
-        state_collection.update({'jobID': job_id}, {"$set": {'state': "writing", 'lastDoneRecord':i}})
+        if state_collection.find({'jobID': job_id}).count > 0:
+            state_collection.update({'jobID': job_id}, {"$set": {'state': "writing", 'lastDoneRecord':i}})
+        else:
+            state_collection.insert({ "jobID": job_id,
+                          "state": "writing",
+                           "lastDoneRecord": file,
+                           "lastDoneRecord": i
+                           }) 
            
 #--------- End of Writing method
 
@@ -392,12 +425,13 @@ def getExecuteTime():
               
 
 class keepAliveThread (threading.Thread):
-    def __init__(self,keepAliveTime,nextkeepAliveTime,doneFlag,op,jobid):
+    def __init__(self,keepAliveTime,nextkeepAliveTime,doneFlag,stopFlag,op,jobid):
         self.process = None
         threading.Thread.__init__(self)
         self.keepAliveTime = keepAliveTime
         self.nextkeepAliveTime = nextkeepAliveTime
         self.doneFlag = doneFlag
+        self.stopFlag = stopFlag
         self.op = op
         self.jobid = jobid
     def run(self):
@@ -414,6 +448,9 @@ class keepAliveThread (threading.Thread):
                 # Receiving from client
                 # Listening for Keep Alive Status
                 try:
+                    if(self.stopFlag == True):
+                        client.close()
+                        break
                     self.nextkeepAliveTime = self.keepAliveTime+KEEPALIVE_TIME_GAP
                     if(self.doneFlag == False):
                         if(self.op == "indexing"):
@@ -436,6 +473,8 @@ class keepAliveThread (threading.Thread):
                     break
     def setDoneFlag(self,doneFlag):
         self.doneFlag = doneFlag
+    def setStopFlag(self,stopFlag):
+        self.stopFlag = stopFlag
         
 class HandleMsg (threading.Thread):
     def __init__(self,conn,doneFlag):
@@ -457,12 +496,6 @@ class HandleMsg (threading.Thread):
         jobid = cmd[1]
         # extract data to see 
         if cmd[0] == "indexing":
-            # start Thread keepAliveThread(keep-alive:indexing)
-            keepAliveTime = getExecuteTime()
-            nextkeepAliveTime = keepAliveTime+KEEPALIVE_TIME_GAP
-            op="indexing"           
-            HeartBeatThread = keepAliveThread(keepAliveTime,nextkeepAliveTime,self.doneFlag,op,jobid)
-            HeartBeatThread.start()
             # while keepAliveTime <= nextkeepAliveTime+10:
             #    keepAliveTime = getExecuteTime()
             #print "test"
@@ -471,22 +504,17 @@ class HandleMsg (threading.Thread):
             
             # call indexingMethod to do indexing 
             indexing(cmd)
-            HeartBeatThread.setDoneFlag(True)  
+            #HeartBeatThread.setDoneFlag(True)  
         elif cmd[0] == "writing":
             print "writing"
-            # start Thread keepAliveThread(keep-alive:writing)
-            keepAliveTime = getExecuteTime()
-            nextkeepAliveTime = keepAliveTime+KEEPALIVE_TIME_GAP
-            op="writing"
-            HeartBeatThread = keepAliveThread(keepAliveTime,nextkeepAliveTime,self.doneFlag,op,jobid)
-            HeartBeatThread.start()
+           
             #while keepAliveTime <= nextkeepAliveTime+10:
             #    keepAliveTime = getExecuteTime()
             # print "test"
             # update StateDB every 5 seconds of its state and last written record
             # call writingMethod to do writing 
             writing(cmd)
-            HeartBeatThread.setDoneFlag(True)
+            #HeartBeatThread.setDoneFlag(True)
         # HeartBeatThread.setDoneFlag(True)
         
 #        self.conn.close()
