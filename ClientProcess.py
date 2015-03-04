@@ -112,6 +112,7 @@ def indexing(command):
     HeartBeatThread.start()
     #HeartBeatThread.setDoneFlag(True)
     #HeartBeatThread.setStopFlag(True)
+    
     #======== index mode ============
     print "Start Indexing"
     if(command[8] == "singleLine"):
@@ -156,6 +157,16 @@ def indexing(command):
         interval = command[18]
         lastIndexedFile = command[19]
         LastDoneRecord = command[20]
+    # init state DB  
+    state_collection = getRecordFromStateDB(state_db_ip,state_db_port)
+    state_collection.insert({ "jobID": command[1],
+                          "state": "indexing",
+                           "lastFileName": "",
+                           "lastDoneRecord": 0,
+                           "db_ip": LOCAL_IP
+                           })     
+    
+    
     # generate find command
     find_cmd = 'find ' + logPath + ' -type f'
     if mmin != "":
@@ -317,7 +328,7 @@ def indexing(command):
                 #############################################################
                 
             if lineNumber%1000 ==0 :
-                state_collection = getRecordFromStateDB(state_db_ip,state_db_port)
+                #state_collection = getRecordFromStateDB(state_db_ip,state_db_port)
                 if state_collection.find({'jobID': job_id}).count > 0:
                     state_collection.update({'jobID': job_id}, {"$set": {'state': "indexing", 'lastFileName':file,
                                                                      'lastDoneRecord':lineNumber,'db_ip':LOCAL_IP}}) 
@@ -347,7 +358,7 @@ def indexing(command):
 #--------- Writing method
 def writing(command):
     """writing##<job_id>##<state_db_ip:state_db_port>##<main_db_ip:main_db_port>##<db_ip:db_port>##lastDoneRecord"""
-    
+   
     # start Thread keepAliveThread(keep-alive:writing)
     keepAliveTime = getExecuteTime()
     nextkeepAliveTime = keepAliveTime+KEEPALIVE_TIME_GAP
@@ -364,7 +375,17 @@ def writing(command):
     main_db_port = int((command[3].split(":"))[1])
     db_ip = (command[4].split(":"))[0] 
     db_port = int((command[4].split(":"))[1])
-    i = 0            
+    i = 0        
+    
+    # init state DB  
+    
+    state_collection = getRecordFromStateDB(state_db_ip,state_db_port)
+    state_collection.insert({ "jobID": job_id,
+                          "state": "writing",
+                           "lastDonefile": "",
+                           "lastDoneRecord": 0
+                           }) 
+        
     #Connect to Other database servers
     db_collection = getlogindexFromOtherDB(db_ip,db_port)
     cursor_ = db_collection.find()
@@ -407,7 +428,7 @@ def writing(command):
                            "endTag": endTag,
                            "job_id" : job_id })
         
-        state_collection = getRecordFromStateDB(state_db_ip,state_db_port)
+        #state_collection = getRecordFromStateDB(state_db_ip,state_db_port)
         if state_collection.find({'jobID': job_id}).count > 0:
             state_collection.update({'jobID': job_id}, {"$set": {'state': "writing", 'lastDoneRecord':i}})
         else:
