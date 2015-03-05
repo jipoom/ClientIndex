@@ -129,11 +129,11 @@ def indexing(command):
         process = command[6]
         logPath = command[7]
         logType = command[8]
-        msisdnRegex = command[9]
+        msisdnRegex = re.compile(command[9])
         dateHolder = command[10]
-        dateRegex = command[11]
+        dateRegex = re.compile(command[11])
         dateFormat = command[12]
-        timeRegex = command[13]
+        timeRegex = re.compile(command[13])
         timeFormat = command[14]
         mmin = command[15]
         interval = command[16]
