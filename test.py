@@ -1,28 +1,31 @@
 import socket, time, threading, gzip,sys,re,os,datetime,errno
 from pymongo import MongoClient
 from xml.dom.minidom import DocumentType
+#netifaces
+from netifaces import AF_INET, AF_INET6, AF_LINK, AF_PACKET, AF_BRIDGE
+import netifaces as ni
+
 # CONSTANT
 KEEPALIVE_TIME_GAP = 2; #seconds
 SHOST = '127.0.0.1'   # Symbolic name meaning all available interfaces
 SPORT = 8888 # Arbitrary non-privileged port
 CHOST = '127.0.0.1'   # Symbolic name meaning all available interfaces
 CPORT = 9990 # Arbitrary non-privileged port
-LOCAL_DB = '192.168.0.213'
+LOCAL_DB = '127.0.0.1'
 LOCAL_PORT = 27017
-ACTUAL_DB = '10.235.36.32'
+ACTUAL_DB = '192.168.1.129'
 ACTUAL_PORT = 2884
-STATE_DB = "192.168.0.213"
+STATE_DB = "192.168.1.42"
 STATE_DB_PORT = 27017
-LOCAL_IP = ''
+LOCAL_IP = '192.168.1.42'
 
 now=datetime.datetime.now()
 
-def getLocalIP(s):
-    try:
-        client = s.getsockname()[0]
-    except socket.error:
-        client = "Unknown IP"
-    return client
+def sleeper():
+    time.sleep(3)
+
+def getLocalIP():
+    return ni.ifaddresses('eth0')[AF_INET][0]['addr']
 
 def getlogfileFromLocalDB():
     # Get log_file collection from Local DB
@@ -103,6 +106,17 @@ def indexing(command):
     eHolder>##<dateRegex>##<dateFormat>##<timeRegex>##<timeFormat>##<mmin
     >##<interval>## lastIndexedFile ##LastDoneRecord=Line_num
     """
+    
+    # start Thread keepAliveThread(keep-alive:indexing)
+    keepAliveTime = getExecuteTime()
+    nextkeepAliveTime = keepAliveTime+KEEPALIVE_TIME_GAP
+    op="indexing"           
+    HeartBeatThread = keepAliveThread(keepAliveTime,nextkeepAliveTime,False,False,op,command[1])
+    HeartBeatThread.start()
+    #HeartBeatThread.setDoneFlag(True)
+    #HeartBeatThread.setStopFlag(True)
+    
+    #try:
     #======== index mode ============
     print "Start Indexing"
     if(command[8] == "singleLine"):
@@ -135,18 +149,21 @@ def indexing(command):
         process = command[6]
         logPath = command[7]
         logType = command[8]
-        logStartTag = command[9]
-        logEndTag = command[10]
-        msisdnRegex = command[11]
+        logStartTag = re.compile(command[9])
+        logEndTag = re.compile(command[10])
+        msisdnRegex = re.compile(command[11])
         dateHolder = command[12]
-        dateRegex = command[13]
+        dateRegex = re.compile(command[13])
         dateFormat = command[14]
-        timeRegex = command[15]
+        timeRegex = re.compile(command[15])
         timeFormat = command[16]
         mmin = command[17]
         interval = command[18]
         lastIndexedFile = command[19]
         LastDoneRecord = command[20]
+     
+    
+    
     # generate find command
     find_cmd = 'find ' + logPath + ' -type f'
     if mmin != "":
@@ -162,100 +179,139 @@ def indexing(command):
     # find file
     f = os.popen(find_cmd)
     files = f.readlines()
-    #####################################################
-    
-    for file in files:
-        try:
-#          today = datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S')
-            #########################
-            ## read file from path ##
-            ###############################################
-            file_path = file.rstrip('\n')
-#            if mode == 'test':
-#                print "PATH: " + file_path + "\n"
-#                print '{0:6}  {1:11}  {2:19}  {3:8}  {4:6}'.format('index', 'msisdn', 'datetime', 'startTag', 'endTag')
-#            else:
-                # check file already indexed?
-#            collection = getlogfileFromLocalDB()
-#            cursor = collection.find_one({"service":service, "system":system, "node":node, "process":process, "path":file_path})
-#            if cursor: # already indexed, skip
-#                print file_path + ", This file is already indexed."
-#                indexLogFile.write( today + " Skip " + file_path + " , This file is already indexed\n")
-#                continue
-#            else: # not indexed add path and date to database
-#                print file_path + ", This file not already indexed."
-#                indexLogFile.write( today + " Index " + file_path + " , This file is not already indexed\n")
-#                collection.insert({"service":service, "system":system, "node":node, "process":process, "path":file_path, "datetime":today})
-                
-            collection = getlogindexFromLocalDB()
-            if '.gz' in file_path:
-                fileContent = gzip.open(file_path,'r')
-            else:
-                fileContent = open(file_path,'r')
-            ###############################################
-    
-            ##########################
-            ## define some variable ##
-            ###############################################
-            lineNumber = 0
-            msisdn = ''
-            date = ''
-            time = ''
-            index = 0
-            startTag = 0
-            endTag = 0
-            showRecord = 0
-            ###############################################
-    
-            #########################################
-            ## if date in path, get date from path ##
-            #################################################################
-            if dateHolder == 'outside' and dateRegex.search(file_path) != None:
-                date = dateRegex.search(file_path).group(1)
-            #################################################################
-    
-            for line in fileContent:
-                lineNumber += 1
-                
-                # To resume unfinished job
-                # Check the file name and set line number
-                if lastIndexedFile in file :
-                    lineNumber = LastDoneRecord
+    if len(files) == 0:
+        #####################################################Sleeper()
+        sleeper()
+        e = sys.exc_info()[0]
+        HeartBeatThread.setDoneFlag(True)
+        print( "<p>Error: %s</p>" % e )
+    else:             
+       
+        for file in files:
+            try:
+    #          today = datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S')
+                #########################
+                ## read file from path ##
+                ###############################################
+                file_path = file.rstrip('\n')
+    #            if mode == 'test':
+    #                print "PATH: " + file_path + "\n"
+    #                print '{0:6}  {1:11}  {2:19}  {3:8}  {4:6}'.format('index', 'msisdn', 'datetime', 'startTag', 'endTag')
+    #            else:
+                    # check file already indexed?
+    #            collection = getlogfileFromLocalDB()
+    #            cursor = collection.find_one({"service":service, "system":system, "node":node, "process":process, "path":file_path})
+    #            if cursor: # already indexed, skip
+    #                print file_path + ", This file is already indexed."
+    #                indexLogFile.write( today + " Skip " + file_path + " , This file is already indexed\n")
+    #                continue
+    #            else: # not indexed add path and date to database
+    #                print file_path + ", This file not already indexed."
+    #                indexLogFile.write( today + " Index " + file_path + " , This file is not already indexed\n")
+    #                collection.insert({"service":service, "system":system, "node":node, "process":process, "path":file_path, "datetime":today})
                     
-                if showRecord == 110: # in test mode exit when already show 110 indexs
-                    sys.exit(1)
-                #############################
-                ## Find msisdn, date, time ##
-                #############################################################
-                if msisdn == '' and msisdnRegex.search(line) != None:
-                    msisdn = msisdnRegex.search(line).group(1)
-                    index = lineNumber
-                if dateHolder == 'inside' and date == '' and dateRegex.search(line) != None:
-                    date = dateRegex.search(line).group(1)
-                if time == '' and timeRegex.search(line) != None:
-                    time = timeRegex.search(line).group(1)
-                #############################################################
-    
-                ######################
-                ## if multiline log ##
-                #############################################################
-                if logType == 'multiLine':
-                    # when find start tag
-                    if logStartTag.search(line) != None:
-                        startTag = lineNumber
-                    # when find end tag
-                    if logEndTag.search(line) != None:
-                        endTag = lineNumber
+                collection = getlogindexFromLocalDB()
+                if '.gz' in file_path:
+                    fileContent = gzip.open(file_path,'r')
+                else:
+                    fileContent = open(file_path,'r')
+                ###############################################
+        
+                ##########################
+                ## define some variable ##
+                ###############################################
+                lineNumber = 0
+                msisdn = ''
+                date = ''
+                time = ''
+                index = 0
+                startTag = 0
+                endTag = 0
+                showRecord = 0
+                ###############################################
+        
+                #########################################
+                ## if date in path, get date from path ##
+                #################################################################
+                if dateHolder == 'outside' and dateRegex.search(file_path) != None:
+                    date = dateRegex.search(file_path).group(1)
+                #################################################################
+        
+                for line in fileContent:
+                    lineNumber = int(lineNumber) + 1
+                    
+                    # To resume unfinished job
+                    # Check the file name and set line number
+                    if lastIndexedFile in file and lastIndexedFile != '':
+                        lineNumber = int(LastDoneRecord)
+                        
+                    if showRecord == 110: # in test mode exit when already show 110 indexs
+                        sys.exit(1)
+                    #############################
+                    ## Find msisdn, date, time ##
+                    #############################################################
+                    if msisdn == '' and msisdnRegex.search(line) != None:
+                        msisdn = msisdnRegex.search(line).group(1)
+                        index = lineNumber
+                    if dateHolder == 'inside' and date == '' and dateRegex.search(line) != None:
+                        date = dateRegex.search(line).group(1)
+                    if time == '' and timeRegex.search(line) != None:
+                        time = timeRegex.search(line).group(1)
+                    #############################################################
+        
+                    ######################
+                    ## if multiline log ##
+                    #############################################################
+                    if logType == 'multiLine':
+                        # when find start tag
+                        if logStartTag.search(line) != None:
+                            startTag = lineNumber
+                        # when find end tag
+                        if logEndTag.search(line) != None:
+                            endTag = lineNumber
+                            # if get all variable that require will print or insert in database
+                            if msisdn != '' and date != '' and time != '':
+                                # combine date time and change format
+                                fullDateTime = date + ' ' + time
+                                fullDateTime = datetime.datetime.strptime(fullDateTime, dateTimeFormat)
+                                fullDateTime = fullDateTime.strftime('%Y/%m/%d %H:%M:%S')
+    #                            if mode == 'test':
+    #                                print '{0:6d}  {1:11}  {2:19}  {3:8d}  {4:6d}'.format(index, msisdn, fullDateTime, startTag, endTag)
+    #                                showRecord += 1
+    #                            else:
+                                collection.insert({ "service": service,
+                                                      "system": system,
+                                                       "node": node,
+                                                    "process": process,
+                                                       "path": file_path,
+                                                       "msisdn": msisdn,
+                                                       "index": index,
+                                                       "datetime": fullDateTime,
+                                                       "startTag": startTag,
+                                                       "endTag": endTag,
+                                                       "job_id" : job_id })
+                            # clear variable when found end tag
+                            msisdn = ''
+                            time = ''
+                            startTag = 0
+                            endTag = 0
+                            if dateHolder == 'inside':
+                                date = ''    # if date in log
+                    #############################################################
+                    #######################
+                    ## if singleline log ##
+                    #############################################################
+                    elif logType == 'singleLine':
                         # if get all variable that require will print or insert in database
                         if msisdn != '' and date != '' and time != '':
                             # combine date time and change format
                             fullDateTime = date + ' ' + time
                             fullDateTime = datetime.datetime.strptime(fullDateTime, dateTimeFormat)
                             fullDateTime = fullDateTime.strftime('%Y/%m/%d %H:%M:%S')
-#                            if mode == 'test':
-#                                print '{0:6d}  {1:11}  {2:19}  {3:8d}  {4:6d}'.format(index, msisdn, fullDateTime, startTag, endTag)
-#                                showRecord += 1
-#                            else:
+    #                        if mode == 'test':
+    #                            print '{0:6d}  {1:11}  {2:19}  {3:8d}  {4:6d}'.format(index, msisdn, fullDateTime, index, index)
+    #                            showRecord += 1
+    #                        else:
                             collection.insert({ "service": service,
                                                   "system": system,
                                                    "node": node,
@@ -264,62 +320,40 @@ def indexing(command):
                                                    "msisdn": msisdn,
                                                    "index": index,
                                                    "datetime": fullDateTime,
-                                                   "startTag": startTag,
-                                                   "endTag": endTag,
+                                                   "startTag": index,
+                                                   "endTag": index,
                                                    "job_id" : job_id })
-                        # clear variable when found end tag
+                        #clear variable every line
                         msisdn = ''
                         time = ''
-                        startTag = 0
-                        endTag = 0
                         if dateHolder == 'inside':
-                            date = ''    # if date in log
-                #############################################################
-                #######################
-                ## if singleline log ##
-                #############################################################
-                elif logType == 'singleLine':
-                    # if get all variable that require will print or insert in database
-                    if msisdn != '' and date != '' and time != '':
-                        # combine date time and change format
-                        fullDateTime = date + ' ' + time
-                        fullDateTime = datetime.datetime.strptime(fullDateTime, dateTimeFormat)
-                        fullDateTime = fullDateTime.strftime('%Y/%m/%d %H:%M:%S')
-#                        if mode == 'test':
-#                            print '{0:6d}  {1:11}  {2:19}  {3:8d}  {4:6d}'.format(index, msisdn, fullDateTime, index, index)
-#                            showRecord += 1
-#                        else:
-                        collection.insert({ "service": service,
-                                              "system": system,
-                                               "node": node,
-                                            "process": process,
-                                               "path": file_path,
-                                               "msisdn": msisdn,
-                                               "index": index,
-                                               "datetime": fullDateTime,
-                                               "startTag": index,
-                                               "endTag": index,
-                                               "job_id" : job_id })
-                    #clear variable every line
-                    msisdn = ''
-                    time = ''
-                    if dateHolder == 'inside':
-                        date = ''    #if date in log
-                #############################################################
-                
-            if lineNumber%1000 ==0 :
-                state_collection = getRecordFromStateDB(state_db_ip,state_db_port)
-                state_collection.update({'jobID': job_id}, {"$set": {'state': "indexing", 'lastFileName':file,
-                                                                     'lastDoneRecord':lineNumber,'db_ip':LOCAL_IP}})                       
-            fileContent.close()
-            # for index test, index a file then exit
-#            if mode == 'test':
-#                break
-        except IOError:
-            print "I/O error"
-    
-#    if mode != 'test':
-        indexLogFile.close()
+                            date = ''    #if date in log
+                    #############################################################
+                    print lineNumber
+                    if lineNumber%1000 ==0 :
+                        state_collection = getRecordFromStateDB(state_db_ip,state_db_port)
+                        state_collection.update({'jobID': job_id}, {"$set": {'state': "indexing", 'lastFileName':file,
+                                                                             'lastDoneRecord':lineNumber,'db_ip':LOCAL_IP}}) 
+
+                                              
+                fileContent.close()
+                # for index test, index a file then exit
+    #            if mode == 'test':
+    #                break
+            except IOError:
+                sleeper()
+                HeartBeatThread.setStopFlag(True)
+                print "I/O error"
+            
+        #    if mode != 'test':
+                indexLogFile.close()
+                HeartBeatThread.setDoneFlag(True)
+   # except:
+   #     ###Sleeper()
+   #     sleeper()
+   ##     e = sys.exc_info()[0]
+    #    HeartBeatThread.setStopFlag(True)
+    #    print( "<p>Error: %s</p>" % e )
     #stop = timeit.default_timer()
     #print stop-start
         
@@ -329,61 +363,78 @@ def indexing(command):
 #--------- Writing method
 def writing(command):
     """writing##<job_id>##<state_db_ip:state_db_port>##<main_db_ip:main_db_port>##<db_ip:db_port>##lastDoneRecord"""
-    
+   
+    # start Thread keepAliveThread(keep-alive:writing)
+    keepAliveTime = getExecuteTime()
+    nextkeepAliveTime = keepAliveTime+KEEPALIVE_TIME_GAP
+    op="writing"
+    HeartBeatThread = keepAliveThread(keepAliveTime,nextkeepAliveTime,False,False,op,command[1])
+    HeartBeatThread.start()    
+    #HeartBeatThread.setDoneFlag(True)
+    #HeartBeatThread.setStopFlag(True)
     #cmd = command.split("##")
-    job_id = command[1]
-    state_db_ip = (command[2].split(":"))[0]
-    state_db_port = int((command[2].split(":"))[1])
-    main_db_ip = (command[3].split(":"))[0]
-    main_db_port = int((command[3].split(":"))[1])
-    db_ip = (command[4].split(":"))[0] 
-    db_port = int((command[4].split(":"))[1])
-    i = 0            
-    #Connect to Other database servers
-    db_collection = getlogindexFromOtherDB(db_ip,db_port)
-    cursor_ = db_collection.find()
-    for cursor in cursor_:
-        i = i+1
-        service = cursor['service']
-        system = cursor['system']
-        node = cursor['node']
-        process = cursor['process']
-        file_path = cursor['path']
-        msisdn = re.compile(cursor['msisdn'])
-        index = re.compile(cursor['index'])
-        fullDateTime = cursor['datetime']
-        startTag = re.compile(cursor['startTag'])
-        endTag = re.compile(cursor['endTag'])
+    try:
+        job_id = command[1]
+        state_db_ip = (command[2].split(":"))[0]
+        state_db_port = int((command[2].split(":"))[1])
+        main_db_ip = (command[3].split(":"))[0]
+        main_db_port = int((command[3].split(":"))[1])
+        db_ip = (command[4].split(":"))[0] 
+        db_port = int((command[4].split(":"))[1])
+        i = 0        
         
-        acutal_collection = getlogindexFromOtherDB(main_db_ip,main_db_port)
-        acutal_collection.insert({ "service": service,
-                          "system": system,
-                           "node": node,
-                        "process": process,
-                           "path": file_path,
-                           "msisdn": msisdn,
-                           "index": index,
-                           "datetime": fullDateTime,
-                           "startTag": startTag,
-                           "endTag": endTag,
-                           "job_id" : job_id })
         
-        #remove a record
-        db_collection.remove({ "service": service,
-                          "system": system,
-                           "node": node,
-                        "process": process,
-                           "path": file_path,
-                           "msisdn": msisdn,
-                           "index": index,
-                           "datetime": fullDateTime,
-                           "startTag": startTag,
-                           "endTag": endTag,
-                           "job_id" : job_id })
-        
-        state_collection = getRecordFromStateDB(state_db_ip,state_db_port)
-        state_collection.update({'jobID': job_id}, {"$set": {'state': "writing", 'lastDoneRecord':i}})
-           
+            
+        #Connect to Other database servers
+        db_collection = getlogindexFromOtherDB(db_ip,db_port)
+        cursor_ = db_collection.find()
+        for cursor in cursor_:
+            i = i+1
+            service = cursor['service']
+            system = cursor['system']
+            node = cursor['node']
+            process = cursor['process']
+            file_path = cursor['path']
+            msisdn = re.compile(cursor['msisdn'])
+            index = re.compile(cursor['index'])
+            fullDateTime = cursor['datetime']
+            startTag = re.compile(cursor['startTag'])
+            endTag = re.compile(cursor['endTag'])
+            
+            acutal_collection = getlogindexFromOtherDB(main_db_ip,main_db_port)
+            acutal_collection.insert({ "service": service,
+                              "system": system,
+                               "node": node,
+                            "process": process,
+                               "path": file_path,
+                               "msisdn": msisdn,
+                               "index": index,
+                               "datetime": fullDateTime,
+                               "startTag": startTag,
+                               "endTag": endTag,
+                               "job_id" : job_id })
+            
+            #remove a record
+            db_collection.remove({ "service": service,
+                              "system": system,
+                               "node": node,
+                            "process": process,
+                               "path": file_path,
+                               "msisdn": msisdn,
+                               "index": index,
+                               "datetime": fullDateTime,
+                               "startTag": startTag,
+                               "endTag": endTag,
+                               "job_id" : job_id })
+            
+            state_collection = getRecordFromStateDB(state_db_ip,state_db_port)
+            state_collection.update({'jobID': job_id}, {"$set": {'state': "writing", 'lastDoneRecord':i}})
+
+            HeartBeatThread.setDoneFlag(True)
+    except:
+        e = sys.exc_info()[0]
+        HeartBeatThread.setStopFlag(True)
+        print( "<p>Error: %s</p>" % e )
 #--------- End of Writing method
 
 def getExecuteTime():
@@ -392,12 +443,13 @@ def getExecuteTime():
               
 
 class keepAliveThread (threading.Thread):
-    def __init__(self,keepAliveTime,nextkeepAliveTime,doneFlag,op,jobid):
+    def __init__(self,keepAliveTime,nextkeepAliveTime,doneFlag,stopFlag,op,jobid):
         self.process = None
         threading.Thread.__init__(self)
         self.keepAliveTime = keepAliveTime
         self.nextkeepAliveTime = nextkeepAliveTime
         self.doneFlag = doneFlag
+        self.stopFlag = stopFlag
         self.op = op
         self.jobid = jobid
     def run(self):
@@ -405,7 +457,7 @@ class keepAliveThread (threading.Thread):
        
         client = socket.socket ( socket.AF_INET, socket.SOCK_STREAM )
         client.connect ( ( SHOST, SPORT ) )
-        LOCAL_IP = getLocalIP(client)
+        LOCAL_IP = getLocalIP()
 
         #infinite loop so that function do not terminate and thread do not end.
         while True:
@@ -414,6 +466,9 @@ class keepAliveThread (threading.Thread):
                 # Receiving from client
                 # Listening for Keep Alive Status
                 try:
+                    if(self.stopFlag == True):
+                        client.close()
+                        break
                     self.nextkeepAliveTime = self.keepAliveTime+KEEPALIVE_TIME_GAP
                     if(self.doneFlag == False):
                         if(self.op == "indexing"):
@@ -436,6 +491,8 @@ class keepAliveThread (threading.Thread):
                     break
     def setDoneFlag(self,doneFlag):
         self.doneFlag = doneFlag
+    def setStopFlag(self,stopFlag):
+        self.stopFlag = stopFlag
         
 class HandleMsg (threading.Thread):
     def __init__(self,conn,doneFlag):
@@ -457,12 +514,6 @@ class HandleMsg (threading.Thread):
         jobid = cmd[1]
         # extract data to see 
         if cmd[0] == "indexing":
-            # start Thread keepAliveThread(keep-alive:indexing)
-            keepAliveTime = getExecuteTime()
-            nextkeepAliveTime = keepAliveTime+KEEPALIVE_TIME_GAP
-            op="indexing"           
-            HeartBeatThread = keepAliveThread(keepAliveTime,nextkeepAliveTime,self.doneFlag,op,jobid)
-            HeartBeatThread.start()
             # while keepAliveTime <= nextkeepAliveTime+10:
             #    keepAliveTime = getExecuteTime()
             #print "test"
@@ -471,22 +522,17 @@ class HandleMsg (threading.Thread):
             
             # call indexingMethod to do indexing 
             indexing(cmd)
-            HeartBeatThread.setDoneFlag(True)  
+            #HeartBeatThread.setDoneFlag(True)  
         elif cmd[0] == "writing":
             print "writing"
-            # start Thread keepAliveThread(keep-alive:writing)
-            keepAliveTime = getExecuteTime()
-            nextkeepAliveTime = keepAliveTime+KEEPALIVE_TIME_GAP
-            op="writing"
-            HeartBeatThread = keepAliveThread(keepAliveTime,nextkeepAliveTime,self.doneFlag,op,jobid)
-            HeartBeatThread.start()
+           
             #while keepAliveTime <= nextkeepAliveTime+10:
             #    keepAliveTime = getExecuteTime()
             # print "test"
             # update StateDB every 5 seconds of its state and last written record
             # call writingMethod to do writing 
             writing(cmd)
-            HeartBeatThread.setDoneFlag(True)
+            #HeartBeatThread.setDoneFlag(True)
         # HeartBeatThread.setDoneFlag(True)
         
 #        self.conn.close()
