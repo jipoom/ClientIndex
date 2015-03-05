@@ -396,11 +396,11 @@ def writing(command):
         node = cursor['node']
         process = cursor['process']
         file_path = cursor['path']
-        msisdn = re.compile(cursor['msisdn'])
-        index = re.compile(cursor['index'])
+        msisdn = cursor['msisdn']
+        index = cursor['index']
         fullDateTime = cursor['datetime']
-        startTag = re.compile(cursor['startTag'])
-        endTag = re.compile(cursor['endTag'])
+        startTag = cursor['startTag']
+        endTag = cursor['endTag']
             
         acutal_collection = getlogindexFromOtherDB(main_db_ip,main_db_port)
         acutal_collection.insert({ "service": service,
