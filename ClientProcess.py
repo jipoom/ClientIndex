@@ -21,6 +21,9 @@ LOCAL_IP = ''
 
 now=datetime.datetime.now()
 
+def sleeper():
+    time.sleep(3)
+
 def getLocalIP():
     return ni.ifaddresses('eth0')[AF_INET][0]['addr']
 
@@ -177,9 +180,10 @@ def indexing(command):
         f = os.popen(find_cmd)
         files = f.readlines()
         if len(files) == 0:
-            #####################################################
+            #####################################################Sleeper()
+            sleeper()
             e = sys.exc_info()[0]
-            HeartBeatThread.setStopFlag(True)
+            HeartBeatThread.setDoneFlag(True)
             print( "<p>Error: %s</p>" % e )
         else:             
            
@@ -337,12 +341,16 @@ def indexing(command):
         #            if mode == 'test':
         #                break
                 except IOError:
+                    sleeper()
+                    HeartBeatThread.setStopFlag(True)
                     print "I/O error"
             
         #    if mode != 'test':
                 indexLogFile.close()
                 HeartBeatThread.setDoneFlag(True)
     except:
+        ###Sleeper()
+        sleeper()
         e = sys.exc_info()[0]
         HeartBeatThread.setStopFlag(True)
         print( "<p>Error: %s</p>" % e )
