@@ -337,6 +337,8 @@ def indexing(command):
 
                                               
                 fileContent.close()
+                indexLogFile.close()
+                HeartBeatThread.setDoneFlag(True)
                 # for index test, index a file then exit
     #            if mode == 'test':
     #                break
@@ -346,8 +348,7 @@ def indexing(command):
                 print "I/O error"
             
         #    if mode != 'test':
-                indexLogFile.close()
-                HeartBeatThread.setDoneFlag(True)
+                
    # except:
    #     ###Sleeper()
    #     sleeper()
