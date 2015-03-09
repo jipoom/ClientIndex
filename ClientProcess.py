@@ -17,7 +17,7 @@ ACTUAL_DB = '192.168.1.129'
 ACTUAL_PORT = 2884
 STATE_DB = "192.168.1.42"
 STATE_DB_PORT = 27017
-LOCAL_IP = '192.168.1.42'
+
 
 now=datetime.datetime.now()
 
@@ -70,7 +70,7 @@ def getRecordFromStateDB(IP,PORT):
     stateCollection = db.StateDB_state
     mongoClient.close()
     # return string containing jobID:state:last_record:node
-    print "getRecordStateDB"
+    # print "getRecordStateDB"
     return stateCollection
 
 #--------- From indexScript.py
@@ -329,7 +329,7 @@ def indexing(command):
                         if dateHolder == 'inside':
                             date = ''    #if date in log
                     #############################################################
-                    print lineNumber
+                    # print lineNumber
                     if lineNumber%1000 ==0 :
                         state_collection = getRecordFromStateDB(state_db_ip,state_db_port)
                         state_collection.update({'jobID': job_id}, {"$set": {'state': "indexing", 'lastFileName':file,
@@ -337,8 +337,7 @@ def indexing(command):
 
                                               
                 fileContent.close()
-                indexLogFile.close()
-                HeartBeatThread.setDoneFlag(True)
+
                 # for index test, index a file then exit
     #            if mode == 'test':
     #                break
@@ -346,7 +345,8 @@ def indexing(command):
                 sleeper()
                 HeartBeatThread.setStopFlag(True)
                 print "I/O error"
-            
+        indexLogFile.close()
+        HeartBeatThread.setDoneFlag(True)    
         #    if mode != 'test':
                 
     # except:
@@ -540,7 +540,7 @@ class HandleMsg (threading.Thread):
         
 #        self.conn.close()
    
-                   
+LOCAL_IP = getLocalIP()            
 
 if __name__ == '__main__':
 
