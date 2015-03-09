@@ -7,9 +7,9 @@ import netifaces as ni
 
 # CONSTANT
 KEEPALIVE_TIME_GAP = 2; #seconds
-SHOST = '127.0.0.1'   # Symbolic name meaning all available interfaces
-SPORT = 8888 # Arbitrary non-privileged port
-CHOST = '127.0.0.1'   # Symbolic name meaning all available interfaces
+SHOST = sys.argv[1]   # Symbolic name meaning all available interfaces
+SPORT = sys.argv[2] # Arbitrary non-privileged port
+CHOST = ''   # Symbolic name meaning all available interfaces
 CPORT = 9990 # Arbitrary non-privileged port
 LOCAL_DB = '127.0.0.1'
 LOCAL_PORT = 27017
