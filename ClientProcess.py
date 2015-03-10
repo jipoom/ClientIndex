@@ -391,7 +391,7 @@ def writing(command):
     db_collection = getlogindexFromOtherDB(db_ip,db_port)
     cursor = db_collection.find({"job_id":job_id})
     for i in range(lastDoneRecord+1,cursor.count()):
-        lineNum = i+1
+        lineNum = i
         #if lastDoneRecord != 0:
         #    i = lastDoneRecord    
         service = cursor[i]['service']
