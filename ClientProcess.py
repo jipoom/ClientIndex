@@ -2,8 +2,9 @@ import socket, time, threading, gzip,sys,re,os,datetime,errno
 from pymongo import MongoClient
 from xml.dom.minidom import DocumentType
 #netifaces
-from netifaces import AF_INET, AF_INET6, AF_LINK, AF_PACKET, AF_BRIDGE
 import netifaces as ni
+from netifaces import AF_INET, AF_INET6, AF_LINK
+
 
 # CONSTANT
 KEEPALIVE_TIME_GAP = 2; #seconds
@@ -25,7 +26,8 @@ def sleeper():
     time.sleep(3)
 
 def getLocalIP():
-    return ni.ifaddresses('eth0')[AF_INET][0]['addr']
+    ip = "192.168.1.43"
+    return ip
 
 def getlogfileFromLocalDB():
     # Get log_file collection from Local DB
@@ -382,25 +384,26 @@ def writing(command):
     main_db_port = int((command[3].split(":"))[1])
     db_ip = (command[4].split(":"))[0] 
     db_port = int((command[4].split(":"))[1])
-    i = 0        
-        
-        
-            
+    lastDoneRecord = int(command[5])
+    i = 0
+               
         #Connect to Other database servers
     db_collection = getlogindexFromOtherDB(db_ip,db_port)
-    cursor_ = db_collection.find()
-    for cursor in cursor_:
-        i = i+1
-        service = cursor['service']
-        system = cursor['system']
-        node = cursor['node']
-        process = cursor['process']
-        file_path = cursor['path']
-        msisdn = cursor['msisdn']
-        index = cursor['index']
-        fullDateTime = cursor['datetime']
-        startTag = cursor['startTag']
-        endTag = cursor['endTag']
+    cursor = db_collection.find({"job_id":job_id})
+    for i in range(0,cursor.count()):
+        lineNum = i+1
+        if lastDoneRecord != 0:
+            i = lastDoneRecord    
+        service = cursor[i]['service']
+        system = cursor[i]['system']
+        node = cursor[i]['node']
+        process = cursor[i]['process']
+        file_path = cursor[i]['path']
+        msisdn = cursor[i]['msisdn']
+        index = cursor[i]['index']
+        fullDateTime = cursor[i]['datetime']
+        startTag = cursor[i]['startTag']
+        endTag = cursor[i]['endTag']
             
         acutal_collection = getlogindexFromOtherDB(main_db_ip,main_db_port)
         acutal_collection.insert({ "service": service,
@@ -429,7 +432,7 @@ def writing(command):
                             "job_id" : job_id })
             
         state_collection = getRecordFromStateDB(state_db_ip,state_db_port)
-        state_collection.update({'jobID': job_id}, {"$set": {'state': "writing", 'lastDoneRecord':i}})
+        state_collection.update({'jobID': job_id}, {"$set": {'state': "writing", 'lastDoneRecord':lineNum}})
 
     HeartBeatThread.setDoneFlag(True)
     #except:
