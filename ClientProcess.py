@@ -390,10 +390,10 @@ def writing(command):
         #Connect to Other database servers
     db_collection = getlogindexFromOtherDB(db_ip,db_port)
     cursor = db_collection.find({"job_id":job_id})
-    for i in range(0,cursor.count()):
+    for i in range(lastDoneRecord+1,cursor.count()):
         lineNum = i+1
-        if lastDoneRecord != 0:
-            i = lastDoneRecord    
+        #if lastDoneRecord != 0:
+        #    i = lastDoneRecord    
         service = cursor[i]['service']
         system = cursor[i]['system']
         node = cursor[i]['node']
