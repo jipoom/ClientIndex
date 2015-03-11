@@ -206,6 +206,7 @@ def indexing(command):
         print( "<p>Error: %s</p>" % e )
     else:             
         indexedList = []
+        # collection = getlogindexFromLocalDB()
         for file in files:
             try:
                 
@@ -230,7 +231,6 @@ def indexing(command):
     #                indexLogFile.write( today + " Index " + file_path + " , This file is not already indexed\n")
     #                collection.insert({"service":service, "system":system, "node":node, "process":process, "path":file_path, "datetime":today})
                     
-                collection = getlogindexFromLocalDB()
                 if '.gz' in file_path:
                     fileContent = gzip.open(file_path,'r')
                 else:
