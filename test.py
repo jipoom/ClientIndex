@@ -205,194 +205,202 @@ def indexing(command):
         HeartBeatThread.setDoneFlag(True)
         print( "<p>Error: %s</p>" % e )
     else:             
+        startFile = False
         indexedList = []
         # collection = getlogindexFromLocalDB()
         for file in files:
-            try:
-                
-    #           today = datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S')
-                #########################
-                ## read file from path ##
-                ###############################################
-                file_path = file.rstrip('\n')
-    #            if mode == 'test':
-    #                print "PATH: " + file_path + "\n"
-    #                print '{0:6}  {1:11}  {2:19}  {3:8}  {4:6}'.format('index', 'msisdn', 'datetime', 'startTag', 'endTag')
-    #            else:
-                    # check file already indexed?
-    #            collection = getlogfileFromLocalDB()
-    #            cursor = collection.find_one({"service":service, "system":system, "node":node, "process":process, "path":file_path})
-    #            if cursor: # already indexed, skip
-    #                print file_path + ", This file is already indexed."
-    #                indexLogFile.write( today + " Skip " + file_path + " , This file is already indexed\n")
-    #                continue
-    #            else: # not indexed add path and date to database
-    #                print file_path + ", This file not already indexed."
-    #                indexLogFile.write( today + " Index " + file_path + " , This file is not already indexed\n")
-    #                collection.insert({"service":service, "system":system, "node":node, "process":process, "path":file_path, "datetime":today})
+            if lastIndexedFile == file:
+                startFile = True
+            if lastIndexedFile == "" or startFile:
+                try:
                     
-                if '.gz' in file_path:
-                    fileContent = gzip.open(file_path,'r')
-                else:
-                    fileContent = open(file_path,'r')
-                ###############################################
-        
-                ##########################
-                ## define some variable ##
-                ###############################################
-                lineNumber = 0
-                msisdn = ''
-                date = ''
-                time = ''
-                index = 0
-                startTag = 0
-                endTag = 0
-                showRecord = 0
-                ###############################################
-        
-                #########################################
-                ## if date in path, get date from path ##
-                #################################################################
-                if dateHolder == 'outside' and dateRegex.search(file_path) != None:
-                    date = dateRegex.search(file_path).group(1)
-                #################################################################
-        
-                for line in fileContent:
-                    lineNumber = int(lineNumber) + 1
-                    
-                    # To resume unfinished job
-                    # Check the file name and set line number
-                    if lastIndexedFile in file and lastIndexedFile != '':
-                        lineNumber = int(LastDoneRecord)
+        #           today = datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S')
+                    #########################
+                    ## read file from path ##
+                    ###############################################
+                    file_path = file.rstrip('\n')
+        #            if mode == 'test':
+        #                print "PATH: " + file_path + "\n"
+        #                print '{0:6}  {1:11}  {2:19}  {3:8}  {4:6}'.format('index', 'msisdn', 'datetime', 'startTag', 'endTag')
+        #            else:
+                        # check file already indexed?
+        #            collection = getlogfileFromLocalDB()
+        #            cursor = collection.find_one({"service":service, "system":system, "node":node, "process":process, "path":file_path})
+        #            if cursor: # already indexed, skip
+        #                print file_path + ", This file is already indexed."
+        #                indexLogFile.write( today + " Skip " + file_path + " , This file is already indexed\n")
+        #                continue
+        #            else: # not indexed add path and date to database
+        #                print file_path + ", This file not already indexed."
+        #                indexLogFile.write( today + " Index " + file_path + " , This file is not already indexed\n")
+        #                collection.insert({"service":service, "system":system, "node":node, "process":process, "path":file_path, "datetime":today})
                         
-                    if showRecord == 110: # in test mode exit when already show 110 indexs
-                        sys.exit(1)
-                    #############################
-                    ## Find msisdn, date, time ##
-                    #############################################################
-                    if msisdn == '' and msisdnRegex.search(line) != None:
-                        msisdn = msisdnRegex.search(line).group(1)
-                        index = lineNumber
-                    if dateHolder == 'inside' and date == '' and dateRegex.search(line) != None:
-                        date = dateRegex.search(line).group(1)
-                    if time == '' and timeRegex.search(line) != None:
-                        time = timeRegex.search(line).group(1)
-                    #############################################################
+                    if '.gz' in file_path:
+                        fileContent = gzip.open(file_path,'r')
+                    else:
+                        fileContent = open(file_path,'r')
+                    ###############################################
+            
+                    ##########################
+                    ## define some variable ##
+                    ###############################################
+                    lineNumber = 0
+                    msisdn = ''
+                    date = ''
+                    time = ''
+                    index = 0
+                    startTag = 0
+                    endTag = 0
+                    showRecord = 0
+                    ###############################################
+            
+                    #########################################
+                    ## if date in path, get date from path ##
+                    #################################################################
+                    if dateHolder == 'outside' and dateRegex.search(file_path) != None:
+                        date = dateRegex.search(file_path).group(1)
+                    #################################################################
+                    startLine = False
+                    for line in fileContent:
+                        lineNumber = int(lineNumber) + 1
+                        if int(LastDoneRecord)+1 == lineNumber:
+                            startLine = True
+                        if LastDoneRecord == "-1" or startLine:
+                            # To resume unfinished job
+                            # Check the file name and set line number
+                            #if lastIndexedFile in file and lastIndexedFile != '':
+                            #    lineNumber = int(LastDoneRecord)
+                                
+                            if showRecord == 110: # in test mode exit when already show 110 indexs
+                                sys.exit(1)
+                            #############################
+                            ## Find msisdn, date, time ##
+                            #############################################################
+                            if msisdn == '' and msisdnRegex.search(line) != None:
+                                msisdn = msisdnRegex.search(line).group(1)
+                                index = lineNumber
+                            if dateHolder == 'inside' and date == '' and dateRegex.search(line) != None:
+                                date = dateRegex.search(line).group(1)
+                            if time == '' and timeRegex.search(line) != None:
+                                time = timeRegex.search(line).group(1)
+                            #############################################################
+                
+                            ######################
+                            ## if multiline log ##
+                            #############################################################
+                            if logType == 'multiLine':
+                                # when find start tag
+                                if logStartTag.search(line) != None:
+                                    startTag = lineNumber
+                                # when find end tag
+                                if logEndTag.search(line) != None:
+                                    endTag = lineNumber
+                                    # if get all variable that require will print or insert in database
+                                    if msisdn != '' and date != '' and time != '':
+                                        # combine date time and change format
+                                        fullDateTime = date + ' ' + time
+                                        fullDateTime = datetime.datetime.strptime(fullDateTime, dateTimeFormat)
+                                        fullDateTime = fullDateTime.strftime('%Y/%m/%d %H:%M:%S')
+            #                            if mode == 'test':
+            #                                print '{0:6d}  {1:11}  {2:19}  {3:8d}  {4:6d}'.format(index, msisdn, fullDateTime, startTag, endTag)
+            #                                showRecord += 1
+            #                            else:
+                                        indexedDict = {
+                                                       "service": service,
+                                                              "system": system,
+                                                               "node": node,
+                                                            "process": process,
+                                                               "path": file_path,
+                                                               "msisdn": msisdn,
+                                                               "index": index,
+                                                               "datetime": fullDateTime,
+                                                               "startTag": startTag,
+                                                               "endTag": endTag,
+                                                               "job_id" : job_id,
+                                                               "lastLine" : lineNumber
+                                                       }
+                                        indexedList.append(indexedDict)
+                                        #collection.insert({ "service": service,
+                                        #                      "system": system,
+                                        #                       "node": node,
+                                        #                    "process": process,
+                                        #                       "path": file_path,
+                                        #                       "msisdn": msisdn,
+                                        #                       "index": index,
+                                        #                       "datetime": fullDateTime,
+                                        #                       "startTag": startTag,
+                                        #                       "endTag": endTag,
+                                        #                       "job_id" : job_id })
+                                    # clear variable when found end tag
+                                    msisdn = ''
+                                    time = ''
+                                    startTag = 0
+                                    endTag = 0
+                                    if dateHolder == 'inside':
+                                        date = ''    # if date in log
+                            #############################################################
+                            #######################
+                            ## if singleline log ##
+                            #############################################################
+                            elif logType == 'singleLine':
+                                # if get all variable that require will print or insert in database
+                                if msisdn != '' and date != '' and time != '':
+                                    # combine date time and change format
+                                    fullDateTime = date + ' ' + time
+                                    fullDateTime = datetime.datetime.strptime(fullDateTime, dateTimeFormat)
+                                    fullDateTime = fullDateTime.strftime('%Y/%m/%d %H:%M:%S')
+            #                        if mode == 'test':
+            #                            print '{0:6d}  {1:11}  {2:19}  {3:8d}  {4:6d}'.format(index, msisdn, fullDateTime, index, index)
+            #                            showRecord += 1
+            #                        else:
+                                    indexedDict = {
+                                                       "service": service,
+                                                          "system": system,
+                                                           "node": node,
+                                                        "process": process,
+                                                           "path": file_path,
+                                                           "msisdn": msisdn,
+                                                           "index": index,
+                                                           "datetime": fullDateTime,
+                                                           "startTag": index,
+                                                           "endTag": index,
+                                                           "job_id" : job_id,
+                                                           "lastLine" : lineNumber
+                                                       }
+                                    indexedList.append(indexedDict)
+                                    #collection.insert({ "service": service,
+                                    #                      "system": system,
+                                    #                       "node": node,
+                                    #                    "process": process,
+                                    #                       "path": file_path,
+                                    #                       "msisdn": msisdn,
+                                    #                       "index": index,
+                                    #                       "datetime": fullDateTime,
+                                    #                       "startTag": index,
+                                    #                       "endTag": index,
+                                    #                       "job_id" : job_id })
+                                #clear variable every line
+                                msisdn = ''
+                                time = ''
+                                if dateHolder == 'inside':
+                                    date = ''    #if date in log
+                            #############################################################
+                            # print lineNumber
+                            #if lineNumber%1000 ==0 :
+                            #    state_collection = getRecordFromStateDB(state_db_ip,state_db_port)
+                            #    state_collection.update({'jobID': job_id}, {"$set": {'state': "indexing", 'lastFileName':file,
+                            #                                                        'lastDoneRecord':lineNumber,'db_ip':LOCAL_IP}}) 
         
-                    ######################
-                    ## if multiline log ##
-                    #############################################################
-                    if logType == 'multiLine':
-                        # when find start tag
-                        if logStartTag.search(line) != None:
-                            startTag = lineNumber
-                        # when find end tag
-                        if logEndTag.search(line) != None:
-                            endTag = lineNumber
-                            # if get all variable that require will print or insert in database
-                            if msisdn != '' and date != '' and time != '':
-                                # combine date time and change format
-                                fullDateTime = date + ' ' + time
-                                fullDateTime = datetime.datetime.strptime(fullDateTime, dateTimeFormat)
-                                fullDateTime = fullDateTime.strftime('%Y/%m/%d %H:%M:%S')
-    #                            if mode == 'test':
-    #                                print '{0:6d}  {1:11}  {2:19}  {3:8d}  {4:6d}'.format(index, msisdn, fullDateTime, startTag, endTag)
-    #                                showRecord += 1
-    #                            else:
-                                indexedDict = {
-                                               "service": service,
-                                                      "system": system,
-                                                       "node": node,
-                                                    "process": process,
-                                                       "path": file_path,
-                                                       "msisdn": msisdn,
-                                                       "index": index,
-                                                       "datetime": fullDateTime,
-                                                       "startTag": startTag,
-                                                       "endTag": endTag,
-                                                       "job_id" : job_id
-                                               }
-                                indexedList.append(indexedDict)
-                                #collection.insert({ "service": service,
-                                #                      "system": system,
-                                #                       "node": node,
-                                #                    "process": process,
-                                #                       "path": file_path,
-                                #                       "msisdn": msisdn,
-                                #                       "index": index,
-                                #                       "datetime": fullDateTime,
-                                #                       "startTag": startTag,
-                                #                       "endTag": endTag,
-                                #                       "job_id" : job_id })
-                            # clear variable when found end tag
-                            msisdn = ''
-                            time = ''
-                            startTag = 0
-                            endTag = 0
-                            if dateHolder == 'inside':
-                                date = ''    # if date in log
-                    #############################################################
-                    #######################
-                    ## if singleline log ##
-                    #############################################################
-                    elif logType == 'singleLine':
-                        # if get all variable that require will print or insert in database
-                        if msisdn != '' and date != '' and time != '':
-                            # combine date time and change format
-                            fullDateTime = date + ' ' + time
-                            fullDateTime = datetime.datetime.strptime(fullDateTime, dateTimeFormat)
-                            fullDateTime = fullDateTime.strftime('%Y/%m/%d %H:%M:%S')
-    #                        if mode == 'test':
-    #                            print '{0:6d}  {1:11}  {2:19}  {3:8d}  {4:6d}'.format(index, msisdn, fullDateTime, index, index)
-    #                            showRecord += 1
-    #                        else:
-                            indexedDict = {
-                                               "service": service,
-                                                  "system": system,
-                                                   "node": node,
-                                                "process": process,
-                                                   "path": file_path,
-                                                   "msisdn": msisdn,
-                                                   "index": index,
-                                                   "datetime": fullDateTime,
-                                                   "startTag": index,
-                                                   "endTag": index,
-                                                   "job_id" : job_id
-                                               }
-                            indexedList.append(indexedDict)
-                            #collection.insert({ "service": service,
-                            #                      "system": system,
-                            #                       "node": node,
-                            #                    "process": process,
-                            #                       "path": file_path,
-                            #                       "msisdn": msisdn,
-                            #                       "index": index,
-                            #                       "datetime": fullDateTime,
-                            #                       "startTag": index,
-                            #                       "endTag": index,
-                            #                       "job_id" : job_id })
-                        #clear variable every line
-                        msisdn = ''
-                        time = ''
-                        if dateHolder == 'inside':
-                            date = ''    #if date in log
-                    #############################################################
-                    # print lineNumber
-                    #if lineNumber%1000 ==0 :
-                    #    state_collection = getRecordFromStateDB(state_db_ip,state_db_port)
-                    #    state_collection.update({'jobID': job_id}, {"$set": {'state': "indexing", 'lastFileName':file,
-                    #                                                        'lastDoneRecord':lineNumber,'db_ip':LOCAL_IP}}) 
-
-                                              
-                fileContent.close()
-
-                # for index test, index a file then exit
-    #            if mode == 'test':
-    #                break
-            except IOError:
-                sleeper()
-                HeartBeatThread.setStopFlag(True)
-                print "I/O error"
+                                                      
+                    fileContent.close()
+    
+                    # for index test, index a file then exit
+        #            if mode == 'test':
+        #                break
+                except IOError:
+                    sleeper()
+                    HeartBeatThread.setStopFlag(True)
+                    print "I/O error"
         #collection = getlogindexFromLocalDB()
         i=0
         while 1:
@@ -414,10 +422,10 @@ def indexing(command):
                                                        "startTag": indexedList[i]['startTag'],
                                                        "endTag": indexedList[i]['endTag'],
                                                        "job_id" : indexedList[i]['job_id'] }, True)
-            if i%1000 ==0 :
+            if i%500==0 :
                 
                 state_collection.update({'jobID': job_id}, {"$set": {'state': "indexing", 'lastFileName':file,
-                                                                                 'lastDoneRecord':i,'db_ip':LOCAL_IP}}) 
+                                                                                 'lastDoneRecord':indexedList[i]['lastLine'],'db_ip':LOCAL_IP}}) 
             i = i+1
         indexLogFile.close()
         HeartBeatThread.setDoneFlag(True)    
