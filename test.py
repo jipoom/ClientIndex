@@ -400,20 +400,19 @@ def indexing(command):
             if(checkDBPerformace(main_db_ip, main_db_port) < 4500):
                 break
         while (i<len(indexedList)):
-           
-            # Check Duplicate first
-            # Insert to DB
-            acutal_collection.insert({ "service": service,
-                                                      "system": system,
-                                                       "node": node,
-                                                    "process": process,
-                                                       "path": file_path,
-                                                       "msisdn": msisdn,
-                                                       "index": index,
-                                                       "datetime": fullDateTime,
-                                                       "startTag": index,
-                                                       "endTag": index,
-                                                       "job_id" : job_id })
+            
+            # Upsert to DB
+            acutal_collection.update({'index' : indexedList[i]['index']},{ "service": indexedList[i]['service'],
+                                                      "system": indexedList[i]['system'],
+                                                       "node": indexedList[i]['node'],
+                                                    "process": indexedList[i]['process'],
+                                                       "path": indexedList[i]['path'],
+                                                       "msisdn": indexedList[i]['msisdn'],
+                                                       "index": indexedList[i]['index'],
+                                                       "datetime": indexedList[i]['datetime'],
+                                                       "startTag": indexedList[i]['startTag'],
+                                                       "endTag": indexedList[i]['endTag'],
+                                                       "job_id" : indexedList[i]['job_id'] }, True)
             if i%1000 ==0 :
                 state_collection = getRecordFromStateDB(state_db_ip,state_db_port)
                 state_collection.update({'jobID': job_id}, {"$set": {'state': "indexing", 'lastFileName':file,
