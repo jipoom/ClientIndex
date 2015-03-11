@@ -394,11 +394,12 @@ def indexing(command):
                 HeartBeatThread.setStopFlag(True)
                 print "I/O error"
         #collection = getlogindexFromLocalDB()
-        acutal_collection = getlogindexFromOtherDB(main_db_ip,main_db_port)
         i=0
         while 1:
             if(checkDBPerformace(main_db_ip, main_db_port) < 4500):
                 break
+        acutal_collection = getlogindexFromOtherDB(main_db_ip,main_db_port)
+        state_collection = getRecordFromStateDB(state_db_ip,state_db_port)
         while (i<len(indexedList)):
             
             # Upsert to DB
@@ -414,7 +415,7 @@ def indexing(command):
                                                        "endTag": indexedList[i]['endTag'],
                                                        "job_id" : indexedList[i]['job_id'] }, True)
             if i%1000 ==0 :
-                state_collection = getRecordFromStateDB(state_db_ip,state_db_port)
+                
                 state_collection.update({'jobID': job_id}, {"$set": {'state': "indexing", 'lastFileName':file,
                                                                                  'lastDoneRecord':i,'db_ip':LOCAL_IP}}) 
             i = i+1
