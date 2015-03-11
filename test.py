@@ -411,7 +411,8 @@ def indexing(command):
         while (i<len(indexedList)):
             
             # Upsert to DB
-            acutal_collection.update({'index' : indexedList[i]['index']},{ "service": indexedList[i]['service'],
+           
+            acutal_collection.update( {"$and": [{"index": indexedList[i]['index']}, {"job_id":indexedList[i]['job_id']}]},{ "service": indexedList[i]['service'],
                                                       "system": indexedList[i]['system'],
                                                        "node": indexedList[i]['node'],
                                                     "process": indexedList[i]['process'],
