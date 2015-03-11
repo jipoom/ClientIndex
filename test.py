@@ -1,6 +1,7 @@
 import socket, time, threading, gzip,sys,re,os,datetime,errno
 from pymongo import MongoClient
 from xml.dom.minidom import DocumentType
+from subprocess import check_output
 #netifaces
 import netifaces as ni
 from netifaces import AF_INET, AF_INET6, AF_LINK
@@ -77,9 +78,9 @@ def getRecordFromStateDB(IP,PORT):
 
 def checkDBPerformace(host,port):
     # check DB workload
-    cmd = "mongostat -host "+host+" -port "+str(port)+" -n 1"
-    output = os.popen(cmd)
-    #output = check_output(["mongostat", "-host",host,"-port",str(port),"-n", "1"])
+    #cmd = "mongostat -host "+host+" -port "+str(port)+" -n 1"
+    #output = os.popen(cmd)
+    output = check_output(["mongostat", "-host",host,"-port",str(port),"-n", "1"])
     insert = output.split('\n')
     # get first column of the result (insert rate)
     insertRate = insert[2][:6]
@@ -137,7 +138,7 @@ def indexing(command):
     if(command[8] == "singleLine"):
         job_id = command[1]
         state_db_ip = (command[2].split(":"))[0]
-        state_db_port = (command[2].split(":"))[1]
+        state_db_port = int((command[2].split(":"))[1])
         service = command[3]
         system = command[4]
         node = command[5]
@@ -154,10 +155,12 @@ def indexing(command):
         interval = command[16]
         lastIndexedFile = command[17]
         LastDoneRecord = command[18]
+        main_db_ip = (command[19].split(":"))[0]
+        main_db_port = int((command[19].split(":"))[1])
     elif(command[8] == "multiLine"):
         job_id = command[1]
         state_db_ip = (command[2].split(":"))[0]
-        state_db_port = (command[2].split(":"))[1]
+        state_db_port = int((command[2].split(":"))[1])
         service = command[3]
         system = command[4]
         node = command[5]
@@ -176,7 +179,8 @@ def indexing(command):
         interval = command[18]
         lastIndexedFile = command[19]
         LastDoneRecord = command[20]
-     
+        main_db_ip = (command[21].split(":"))[0]
+        main_db_port = int((command[21].split(":"))[1])
     
     
     # generate find command
@@ -389,25 +393,29 @@ def indexing(command):
                 sleeper()
                 HeartBeatThread.setStopFlag(True)
                 print "I/O error"
-        collection = getlogindexFromLocalDB()
+        #collection = getlogindexFromLocalDB()
+        acutal_collection = getlogindexFromOtherDB(main_db_ip,main_db_port)
         i=0
         while (i<len(indexedList)):
-            collection.insert({ "service": service,
-                                                  "system": system,
-                                                   "node": node,
-                                                "process": process,
-                                                   "path": file_path,
-                                                   "msisdn": msisdn,
-                                                   "index": index,
-                                                   "datetime": fullDateTime,
-                                                   "startTag": index,
-                                                   "endTag": index,
-                                                   "job_id" : job_id })
-            if i%1000 ==0 :
-                        state_collection = getRecordFromStateDB(state_db_ip,state_db_port)
-                        state_collection.update({'jobID': job_id}, {"$set": {'state': "indexing", 'lastFileName':file,
-                                                                             'lastDoneRecord':i,'db_ip':LOCAL_IP}}) 
-            i = i+1
+            if(checkDBPerformace(main_db_ip, main_db_port) < 5000):
+                # Check Duplicate first
+                # Insert to DB
+                acutal_collection.insert({ "service": service,
+                                                      "system": system,
+                                                       "node": node,
+                                                    "process": process,
+                                                       "path": file_path,
+                                                       "msisdn": msisdn,
+                                                       "index": index,
+                                                       "datetime": fullDateTime,
+                                                       "startTag": index,
+                                                       "endTag": index,
+                                                       "job_id" : job_id })
+                if i%1000 ==0 :
+                            state_collection = getRecordFromStateDB(state_db_ip,state_db_port)
+                            state_collection.update({'jobID': job_id}, {"$set": {'state': "indexing", 'lastFileName':file,
+                                                                                 'lastDoneRecord':i,'db_ip':LOCAL_IP}}) 
+                i = i+1
         indexLogFile.close()
         HeartBeatThread.setDoneFlag(True)    
         #    if mode != 'test':
