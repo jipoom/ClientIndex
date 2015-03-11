@@ -396,11 +396,14 @@ def indexing(command):
         #collection = getlogindexFromLocalDB()
         acutal_collection = getlogindexFromOtherDB(main_db_ip,main_db_port)
         i=0
+        while 1:
+            if(checkDBPerformace(main_db_ip, main_db_port) < 4500):
+                break
         while (i<len(indexedList)):
-            if(checkDBPerformace(main_db_ip, main_db_port) < 5000):
-                # Check Duplicate first
-                # Insert to DB
-                acutal_collection.insert({ "service": service,
+           
+            # Check Duplicate first
+            # Insert to DB
+            acutal_collection.insert({ "service": service,
                                                       "system": system,
                                                        "node": node,
                                                     "process": process,
@@ -411,11 +414,11 @@ def indexing(command):
                                                        "startTag": index,
                                                        "endTag": index,
                                                        "job_id" : job_id })
-                if i%1000 ==0 :
-                            state_collection = getRecordFromStateDB(state_db_ip,state_db_port)
-                            state_collection.update({'jobID': job_id}, {"$set": {'state': "indexing", 'lastFileName':file,
+            if i%1000 ==0 :
+                state_collection = getRecordFromStateDB(state_db_ip,state_db_port)
+                state_collection.update({'jobID': job_id}, {"$set": {'state': "indexing", 'lastFileName':file,
                                                                                  'lastDoneRecord':i,'db_ip':LOCAL_IP}}) 
-                i = i+1
+            i = i+1
         indexLogFile.close()
         HeartBeatThread.setDoneFlag(True)    
         #    if mode != 'test':
