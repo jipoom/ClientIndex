@@ -19,7 +19,7 @@ ACTUAL_DB = '192.168.1.129'
 ACTUAL_PORT = 2884
 STATE_DB = "192.168.1.42"
 STATE_DB_PORT = 27017
-
+ETHER_PORT = sys.argv[3]
 
 now=datetime.datetime.now()
 
@@ -27,8 +27,7 @@ def sleeper():
     time.sleep(3)
 
 def getLocalIP():
-    ip = "192.168.1.43"
-    return ip
+    return ni.ifaddresses(ETHER_PORT)[AF_INET][0]['addr']
 
 def getlogfileFromLocalDB():
     # Get log_file collection from Local DB
