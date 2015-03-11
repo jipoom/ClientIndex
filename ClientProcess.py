@@ -1,6 +1,7 @@
 import socket, time, threading, gzip,sys,re,os,datetime,errno
 from pymongo import MongoClient
 from xml.dom.minidom import DocumentType
+from subprocess import check_output
 #netifaces
 import netifaces as ni
 from netifaces import AF_INET, AF_INET6, AF_LINK
@@ -74,6 +75,19 @@ def getRecordFromStateDB(IP,PORT):
     # return string containing jobID:state:last_record:node
     # print "getRecordStateDB"
     return stateCollection
+
+def checkDBPerformace(host,port):
+    # check DB workload
+    cmd = "mongostat -host "+host+" -port "+str(port)+" -n 1"
+    output = os.popen(cmd)
+    #output = check_output(["mongostat", "-host",host,"-port",str(port),"-n", "1"])
+    insert = output.split('\n')
+    # get first column of the result (insert rate)
+    insertRate = insert[2][:6]
+    # performace rate
+    # print output
+    # print insertRate
+    return (int)(insertRate.translate(None, ' *'))
 
 #--------- From indexScript.py
 def mkdir_p(path):
