@@ -209,8 +209,9 @@ def indexing(command):
         startFile = False
         startLine = False
         indexedList = []
+        logFileList = []
         # collection = getlogindexFromLocalDB()
-        collection = getlogfileFromActualDB(main_db_ip,main_db_port)
+        logFilecollection = getlogfileFromActualDB(main_db_ip,main_db_port)
         for file in files:
             #if lastIndexedFile == file:
             #    startFile = True
@@ -228,7 +229,7 @@ def indexing(command):
     #            else:
                     # check file already indexed?
                 
-                cursor = collection.find_one({"service":service, "system":system, "node":node, "process":process, "path":file_path})
+                cursor = logFilecollection.find_one({"service":service, "system":system, "node":node, "process":process, "path":file_path})
                 if cursor: # already indexed, skip
                     print file_path + ", This file is already indexed."
                     indexLogFile.write( today + " Skip " + file_path + " , This file is already indexed\n")
@@ -236,7 +237,15 @@ def indexing(command):
                 else: # not indexed add path and date to database
                     print file_path + ", This file not already indexed."
                     indexLogFile.write( today + " Index " + file_path + " , This file is not already indexed\n")
-                    collection.insert({"service":service, "system":system, "node":node, "process":process, "path":file_path, "datetime":today})
+                    logFileDict = {
+                           'service': service,
+                           'system':system,
+                           'node':node,
+                           'process':process,
+                           'path': file_path,
+                           'datetime': today
+                           }
+                    logFileList.append(logFileDict)
                     
                 if '.gz' in file_path:
                     fileContent = gzip.open(file_path,'r')
@@ -433,7 +442,10 @@ def indexing(command):
                                                                                  'lastDoneRecord':indexedList[i]['lastLine'],'db_ip':LOCAL_IP}}) 
             i = i+1
         indexLogFile.close()
-        HeartBeatThread.setDoneFlag(True)    
+        for i in range(0,len(logFileList)):
+            logFilecollection.insert({"service":logFileList[i]['service'], "system":logFileList[i]['system'], "node":logFileList[i]['node'], "process":logFileList[i]['process'], "path":logFileList[i]['path'], "datetime":logFileList[i]['datetime']}) 
+        HeartBeatThread.setDoneFlag(True) 
+          
         #    if mode != 'test':
                 
     # except:
@@ -518,7 +530,7 @@ def writing(command):
             
         state_collection = getRecordFromStateDB(state_db_ip,state_db_port)
         state_collection.update({'jobID': job_id}, {"$set": {'state': "writing", 'lastDoneRecord':lineNum}})
-
+        
     HeartBeatThread.setDoneFlag(True)
     #except:
     #    e = sys.exc_info()[0]
@@ -576,7 +588,7 @@ class keepAliveThread (threading.Thread):
                         client.close()                  
             except socket.error:
                 #came out of loop
-                print "Master is down!!!"
+                print "Master Bye!!!"
                 client.close()
                 break
     def setDoneFlag(self,doneFlag):
