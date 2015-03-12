@@ -210,6 +210,7 @@ def indexing(command):
         startLine = False
         indexedList = []
         logFileList = []
+        error = False
         # collection = getlogindexFromLocalDB()
         logFilecollection = getlogfileFromActualDB(main_db_ip,main_db_port)
         for file in files:
@@ -237,15 +238,15 @@ def indexing(command):
                 else: # not indexed add path and date to database
                     print file_path + ", This file not already indexed."
                     indexLogFile.write( today + " Index " + file_path + " , This file is not already indexed\n")
-                    logFileDict = {
-                           'service': service,
-                           'system':system,
-                           'node':node,
-                           'process':process,
-                           'path': file_path,
-                           'datetime': today
-                           }
-                    logFileList.append(logFileDict)
+                    #logFileDict = {
+                    #       'service': service,
+                    #       'system':system,
+                    #       'node':node,
+                    #       'process':process,
+                    #       'path': file_path,
+                    #       'datetime': today
+                    #       }
+                    #logFileList.append(logFileDict)
                     
                 if '.gz' in file_path:
                     fileContent = gzip.open(file_path,'r')
@@ -404,14 +405,17 @@ def indexing(command):
     
                                                   
                 fileContent.close()
-
+                
                 # for index test, index a file then exit
     #            if mode == 'test':
     #                break
             except IOError:
                 sleeper(3)
                 HeartBeatThread.setStopFlag(True)
+                error = True
                 print "I/O error"
+        if not error:        
+            logFilecollection.insert({"service":service, "system":system, "node":node, "process":process, "path":file_path, "datetime":today})         
         #collection = getlogindexFromLocalDB()
         i=0
         while 1:
@@ -442,8 +446,8 @@ def indexing(command):
                                                                                  'lastDoneRecord':indexedList[i]['lastLine'],'db_ip':LOCAL_IP}}) 
             i = i+1
         indexLogFile.close()
-        for i in range(0,len(logFileList)):
-            logFilecollection.insert({"service":logFileList[i]['service'], "system":logFileList[i]['system'], "node":logFileList[i]['node'], "process":logFileList[i]['process'], "path":logFileList[i]['path'], "datetime":logFileList[i]['datetime']}) 
+        #for i in range(0,len(logFileList)):
+        #    logFilecollection.insert({"service":logFileList[i]['service'], "system":logFileList[i]['system'], "node":logFileList[i]['node'], "process":logFileList[i]['process'], "path":logFileList[i]['path'], "datetime":logFileList[i]['datetime']}) 
         HeartBeatThread.setDoneFlag(True) 
           
         #    if mode != 'test':
