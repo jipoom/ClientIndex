@@ -23,8 +23,8 @@ ETHER_PORT = sys.argv[3]
 
 now=datetime.datetime.now()
 
-def sleeper(seconds):
-    time.sleep(seconds)
+def sleeper():
+    time.sleep(3)
 
 def getLocalIP():
     return ni.ifaddresses(ETHER_PORT)[AF_INET][0]['addr']
@@ -125,10 +125,10 @@ def indexing(command):
     """
     
     # start Thread keepAliveThread(keep-alive:indexing)
-    #keepAliveTime = getExecuteTime()
-    #nextkeepAliveTime = keepAliveTime+KEEPALIVE_TIME_GAP
+    keepAliveTime = getExecuteTime()
+    nextkeepAliveTime = keepAliveTime+KEEPALIVE_TIME_GAP
     op="indexing"           
-    HeartBeatThread = keepAliveThread(False,False,op,command[1])
+    HeartBeatThread = keepAliveThread(keepAliveTime,nextkeepAliveTime,False,False,op,command[1])
     HeartBeatThread.start()
     #HeartBeatThread.setDoneFlag(True)
     #HeartBeatThread.setStopFlag(True)
@@ -201,13 +201,12 @@ def indexing(command):
     files = f.readlines()
     if len(files) == 0:
         #####################################################Sleeper()
-        sleeper(3)
+        sleeper()
         e = sys.exc_info()[0]
         HeartBeatThread.setDoneFlag(True)
         print( "<p>Error: %s</p>" % e )
     else:             
         startFile = False
-        startLine = False
         indexedList = []
         # collection = getlogindexFromLocalDB()
         for file in files:
@@ -262,6 +261,7 @@ def indexing(command):
                     if dateHolder == 'outside' and dateRegex.search(file_path) != None:
                         date = dateRegex.search(file_path).group(1)
                     #################################################################
+                    startLine = False
                     for line in fileContent:
                         lineNumber = int(lineNumber) + 1
                         if int(LastDoneRecord)+1 == lineNumber:
@@ -399,7 +399,7 @@ def indexing(command):
         #            if mode == 'test':
         #                break
                 except IOError:
-                    sleeper(3)
+                    sleeper()
                     HeartBeatThread.setStopFlag(True)
                     print "I/O error"
         #collection = getlogindexFromLocalDB()
@@ -407,8 +407,6 @@ def indexing(command):
         while 1:
             if(checkDBPerformace(main_db_ip, main_db_port) < 4500):
                 break
-            else:
-                sleeper(3)
         acutal_collection = getlogindexFromOtherDB(main_db_ip,main_db_port)
         state_collection = getRecordFromStateDB(state_db_ip,state_db_port)
         while (i<len(indexedList)):
@@ -436,8 +434,8 @@ def indexing(command):
         #    if mode != 'test':
                 
     # except:
-    #     ###Sleeper(3)
-    #     sleeper(3)
+    #     ###Sleeper()
+    #     sleeper()
     ##     e = sys.exc_info()[0]
     #    HeartBeatThread.setStopFlag(True)
     #    print( "<p>Error: %s</p>" % e )
@@ -531,9 +529,11 @@ def getExecuteTime():
               
 
 class keepAliveThread (threading.Thread):
-    def __init__(self,doneFlag,stopFlag,op,jobid):
+    def __init__(self,keepAliveTime,nextkeepAliveTime,doneFlag,stopFlag,op,jobid):
         self.process = None
         threading.Thread.__init__(self)
+        self.keepAliveTime = keepAliveTime
+        self.nextkeepAliveTime = nextkeepAliveTime
         self.doneFlag = doneFlag
         self.stopFlag = stopFlag
         self.op = op
@@ -547,37 +547,36 @@ class keepAliveThread (threading.Thread):
 
         #infinite loop so that function do not terminate and thread do not end.
         while True:
-        #    self.keepAliveTime =  getExecuteTime()
-        #    if self.keepAliveTime >= self.nextkeepAliveTime:
+            self.keepAliveTime =  getExecuteTime()
+            if self.keepAliveTime >= self.nextkeepAliveTime:
                 # Receiving from client
                 # Listening for Keep Alive Status
-            sleeper(KEEPALIVE_TIME_GAP)
-            try:
-                if(self.stopFlag == True):
+                try:
+                    if(self.stopFlag == True):
+                        client.close()
+                        break
+                    self.nextkeepAliveTime = self.keepAliveTime+KEEPALIVE_TIME_GAP
+                    if(self.doneFlag == False):
+                        if(self.op == "indexing"):
+                            print self.jobid+"##indexing"
+                            client.send (self.jobid+'##indexing')
+                        else:
+                            print self.jobid+"##writing"
+                            client.send (self.jobid+'##writing')
+                    else:
+                        if(self.op == "indexing"):
+                            print self.jobid+"##indexing-done"
+                            client.send (self.jobid+'##indexing-done')  
+                            client.close()
+                        else:  
+                            print self.jobid+"##writing-done"
+                            client.send (self.jobid+'##writing-done') 
+                            client.close()                  
+                except socket.error:
+                    #came out of loop
+                    print "Master is down!!!"
                     client.close()
                     break
-                #self.nextkeepAliveTime = self.keepAliveTime+KEEPALIVE_TIME_GAP
-                if(self.doneFlag == False):
-                    if(self.op == "indexing"):
-                        print self.jobid+"##indexing"
-                        client.send (self.jobid+'##indexing')
-                    else:
-                        print self.jobid+"##writing"
-                        client.send (self.jobid+'##writing')
-                else:
-                    if(self.op == "indexing"):
-                        print self.jobid+"##indexing-done"
-                        client.send (self.jobid+'##indexing-done')  
-                        client.close()
-                    else:  
-                        print self.jobid+"##writing-done"
-                        client.send (self.jobid+'##writing-done') 
-                        client.close()                  
-            except socket.error:
-                #came out of loop
-                print "Master is down!!!"
-                client.close()
-                break
     def setDoneFlag(self,doneFlag):
         self.doneFlag = doneFlag
     def setStopFlag(self,stopFlag):
@@ -598,7 +597,6 @@ class HandleMsg (threading.Thread):
         #        eHolder>##<dateRegex>##<dateFormat>##<timeRegex>##<timeFormat>##<mmin\
         #        >##<interval>## lastIndexedFile ##LastDoneRecord=Line_num"
         # Split command
-        print "Got Task : "+datetime.datetime.fromtimestamp(int(getExecuteTime())).strftime('%Y-%m-%d %H:%M:%S')
         print data
         cmd = data.split("##")
         jobid = cmd[1]
