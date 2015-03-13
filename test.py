@@ -279,14 +279,14 @@ def indexing(command):
                 print "***************************"
                 print fileContent
                 print lastIndexedFile
-                print file
+                print file_path
                 print "***************************"
                 for line in fileContent:
                     lineNumber = int(lineNumber) + 1
-                    if int(LastDoneRecord)+1 == lineNumber and lastIndexedFile in file and lastIndexedFile != '' :
+                    if int(LastDoneRecord)+1 == lineNumber and lastIndexedFile == file_path and lastIndexedFile != '' :
                         print lineNumber
                         startLine = True
-                    if LastDoneRecord == "-1" or startLine or lastIndexedFile not in file or lastIndexedFile == '':
+                    if LastDoneRecord == "-1" or startLine or lastIndexedFile != file_path or lastIndexedFile == '':
                         # To resume unfinished job
                         # Check the file name and set line number
                         #if lastIndexedFile in file and lastIndexedFile != '':
