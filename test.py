@@ -278,15 +278,15 @@ def indexing(command):
                 #################################################################
                 print "***************************"
                 print fileContent
-                print lastIndexedFile
+                print lastIndexedFile.rstrip('\n') 
                 print file_path
                 print "***************************"
                 for line in fileContent:
                     lineNumber = int(lineNumber) + 1
-                    if int(LastDoneRecord)+1 == lineNumber and lastIndexedFile == file_path and lastIndexedFile != '' :
+                    if int(LastDoneRecord)+1 == lineNumber and lastIndexedFile.rstrip('\n')  == file_path and lastIndexedFile != '' :
                         print lineNumber
                         startLine = True
-                    if LastDoneRecord == "-1" or startLine or lastIndexedFile != file_path or lastIndexedFile == '':
+                    if LastDoneRecord == "-1" or startLine or lastIndexedFile.rstrip('\n')  != file_path or lastIndexedFile == '':
                         # To resume unfinished job
                         # Check the file name and set line number
                         #if lastIndexedFile in file and lastIndexedFile != '':
@@ -445,7 +445,7 @@ def indexing(command):
             
             # Upsert to DB
            
-            acutal_collection.update( {"$and": [{"index": indexedList[i]['index']}, {"job_id":indexedList[i]['job_id']}]},{ "service": indexedList[i]['service'],
+            acutal_collection.update( {"$and": [{"index": indexedList[i]['index']},{"startTag": indexedList[i]['startTag']},{"endTag": indexedList[i]['endTag']}, {"job_id":indexedList[i]['job_id']}]},{ "service": indexedList[i]['service'],
                                                       "system": indexedList[i]['system'],
                                                        "node": indexedList[i]['node'],
                                                     "process": indexedList[i]['process'],
