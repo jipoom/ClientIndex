@@ -419,7 +419,7 @@ def indexing(command):
                 fileContent.close()
                 lastLineList.append(recordCount)
                 # insert only specified type of log
-                if recordCount != -1 and isIndexed:
+                if isIndexed:
                     logFileList.append(logFileDict)
                 # for index test, index a file then exit
     #            if mode == 'test':
@@ -462,7 +462,7 @@ def indexing(command):
                 j = j+1
             if i%500==0 :
                 print indexedList[i]['lastLine']
-                state_collection.update({'jobID': job_id}, {"$set": {'state': "indexing", 'lastFileName':file,
+                state_collection.update({'jobID': job_id}, {"$set": {'state': "indexing", 'lastFileName':indexedList[i]['path'],
                                                                                  'lastDoneRecord':indexedList[i]['lastLine'],'db_ip':LOCAL_IP}}) 
             i = i+1
         indexLogFile.close()
