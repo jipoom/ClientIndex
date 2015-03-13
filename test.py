@@ -267,6 +267,7 @@ def indexing(command):
                 startTag = 0
                 endTag = 0
                 showRecord = 0
+                isIndexed = False
                 ###############################################
         
                 #########################################
@@ -278,6 +279,7 @@ def indexing(command):
                 print "***************************"
                 print fileContent
                 print lastIndexedFile
+                print file
                 print "***************************"
                 for line in fileContent:
                     lineNumber = int(lineNumber) + 1
@@ -340,6 +342,7 @@ def indexing(command):
                                                    }
                                     indexedList.append(indexedDict)
                                     recordCount = recordCount+1  
+                                    isIndexed = True
                                     #collection.insert({ "service": service,
                                     #                      "system": system,
                                     #                       "node": node,
@@ -388,7 +391,8 @@ def indexing(command):
                                                        "lastLine" : lineNumber
                                                    }
                                 indexedList.append(indexedDict)
-                                recordCount = recordCount+1  
+                                recordCount = recordCount+1 
+                                isIndexed = True 
                                 #collection.insert({ "service": service,
                                 #                      "system": system,
                                 #                       "node": node,
@@ -415,7 +419,7 @@ def indexing(command):
                 fileContent.close()
                 lastLineList.append(recordCount)
                 # insert only specified type of log
-                if recordCount != -1:
+                if recordCount != -1 and isIndexed:
                     logFileList.append(logFileDict)
                 # for index test, index a file then exit
     #            if mode == 'test':
@@ -454,9 +458,10 @@ def indexing(command):
                                                        "job_id" : indexedList[i]['job_id'] }, True)
             if i in lastLineList:
                 logFilecollection.insert({"service":logFileList[j]['service'], "system":logFileList[j]['system'], "node":logFileList[j]['node'], "process":logFileList[j]['process'], "path":logFileList[j]['path'], "datetime":logFileList[j]['datetime']}) 
+                print logFileList[j]['path']
                 j = j+1
             if i%500==0 :
-                
+                print indexedList[i]['lastLine']
                 state_collection.update({'jobID': job_id}, {"$set": {'state': "indexing", 'lastFileName':file,
                                                                                  'lastDoneRecord':indexedList[i]['lastLine'],'db_ip':LOCAL_IP}}) 
             i = i+1
