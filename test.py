@@ -77,18 +77,24 @@ def getRecordFromStateDB(IP,PORT):
     # print "getRecordStateDB"
     return stateCollection
 
-def checkDBPerformace(host,port):
+def checkDBPerformance(host,port):
     # check DB workload
     #cmd = "mongostat -host "+host+" -port "+str(port)+" -n 1"
     #output = os.popen(cmd)
     output = check_output(["mongostat", "-host",host,"-port",str(port),"-n", "1"])
-    insert = output.split('\n')
+    rate = output.split('\n')
     # get first column of the result (insert rate)
-    insertRate = insert[2][:6]
-    # performace rate
-    # print output
-    # print insertRate
-    return (int)(insertRate.translate(None, ' *'))
+    insertRate = rate[2][:6]
+    queryRate = rate[2][6:13]
+    updateRate = rate[2][13:20]
+    deleteRate = rate[2][21:27]
+    #print output
+    #print insertRate
+    #print queryRate
+    #print updateRate
+    #print deleteRate
+    return (int)(insertRate.translate(None, ' *'))+(int)(queryRate.translate(None, ' *'))+(int)(updateRate.translate(None, ' *'))+(int)(deleteRate.translate(None, ' *'))
+
 
 #--------- From indexScript.py
 def mkdir_p(path):
@@ -433,9 +439,10 @@ def indexing(command):
         print lastLineList
         print logFileList[0]
         while 1:
-            if(checkDBPerformace(main_db_ip, main_db_port) < 4500):
+            if(checkDBPerformance(main_db_ip, main_db_port) < 4500):
                 break
             else:
+                print "Indexed_DB : "+job_id+" : too many concurrent transactions" 
                 sleeper(3)
         acutal_collection = getlogindexFromOtherDB(main_db_ip,main_db_port)
         state_collection = getRecordFromStateDB(state_db_ip,state_db_port)
