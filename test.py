@@ -77,7 +77,7 @@ def getRecordFromStateDB(IP,PORT):
     # print "getRecordStateDB"
     return stateCollection
 
-def checkDBPerformance(host,port):
+def DBTransactions(host,port):
     # check DB workload
     #cmd = "mongostat -host "+host+" -port "+str(port)+" -n 1"
     #output = os.popen(cmd)
@@ -439,7 +439,7 @@ def indexing(command):
         print lastLineList
         print logFileList[0]
         while 1:
-            if(checkDBPerformance(main_db_ip, main_db_port) < 4500):
+            if(DBTransactions(main_db_ip, main_db_port) < 4500):
                 break
             else:
                 print "Indexed_DB : "+job_id+" : too many concurrent transactions" 
