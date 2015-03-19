@@ -201,7 +201,7 @@ def indexing(command):
     
     dateTimeFormat = dateFormat + ' ' + timeFormat
     
-    print "Find file with '"+ find_cmd +"'"
+    print "["+datetime.datetime.fromtimestamp(int(getExecuteTime())).strftime('%Y-%m-%d %H:%M:%S')+"] Find file with '"+ find_cmd +"'"
     # find file
     f = os.popen(find_cmd)
     files = f.readlines()
@@ -210,7 +210,7 @@ def indexing(command):
         sleeper(3)
         e = sys.exc_info()[0]
         HeartBeatThread.setDoneFlag(True)
-        print( "<p>Error: %s</p>" % e )
+        print( "["+datetime.datetime.fromtimestamp(int(getExecuteTime())).strftime('%Y-%m-%d %H:%M:%S')+"] <p>Error: %s</p>" % e )
     else:             
         #startFile = False
         startLine = False
@@ -240,11 +240,11 @@ def indexing(command):
                 
                 cursor = logFilecollection.find_one({"service":service, "system":system, "node":node, "process":process, "path":file_path})
                 if cursor: # already indexed, skip
-                    print file_path + ", This file is already indexed."
+                    print "["+datetime.datetime.fromtimestamp(int(getExecuteTime())).strftime('%Y-%m-%d %H:%M:%S')+"] "+file_path + ", This file is already indexed."
                     indexLogFile.write( today + " Skip " + file_path + " , This file is already indexed\n")
                     continue
                 else: # not indexed add path and date to database
-                    print file_path + ", This file not already indexed."
+                    print "["+datetime.datetime.fromtimestamp(int(getExecuteTime())).strftime('%Y-%m-%d %H:%M:%S')+"] "+file_path + ", This file not already indexed."
                     indexLogFile.write( today + " Index " + file_path + " , This file is not already indexed\n")
                     logFileDict = {
                            'service': service,
@@ -282,15 +282,16 @@ def indexing(command):
                 if dateHolder == 'outside' and dateRegex.search(file_path) != None:
                     date = dateRegex.search(file_path).group(1)
                 #################################################################
-                print "***************************"
-                print fileContent
-                print lastIndexedFile.rstrip('\n') 
-                print file_path
-                print "***************************"
+                #print "***************************"
+                #print fileContent
+                #print lastIndexedFile.rstrip('\n') 
+                #print file_path
+                #print "***************************"
                 for line in fileContent:
                     lineNumber = int(lineNumber) + 1
+                    # check if the current line match last done record of the last indexed file
                     if int(LastDoneRecord)+1 == lineNumber and lastIndexedFile.rstrip('\n')  == file_path and lastIndexedFile != '' :
-                        print lineNumber
+                        #print lineNumber
                         startLine = True
                     if LastDoneRecord == "-1" or startLine or lastIndexedFile.rstrip('\n')  != file_path or lastIndexedFile == '':
                         # To resume unfinished job
@@ -433,16 +434,17 @@ def indexing(command):
             except IOError:
                 sleeper(3)
                 HeartBeatThread.setStopFlag(True)
-                print "I/O error"              
+                print "["+datetime.datetime.fromtimestamp(int(getExecuteTime())).strftime('%Y-%m-%d %H:%M:%S')+"] I/O error"              
         #collection = getlogindexFromLocalDB()
         
-        print lastLineList
-        print logFileList[0]
+        #print lastLineList
+        #if len(logFileList) > 0:
+        #    print logFileList[0]
         while 1:
             if(DBTransactions(main_db_ip, main_db_port) < 4500):
                 break
             else:
-                print "Indexed_DB : "+job_id+" : too many concurrent transactions" 
+                print "["+datetime.datetime.fromtimestamp(int(getExecuteTime())).strftime('%Y-%m-%d %H:%M:%S')+"] Indexed_DB : "+job_id+" : too many concurrent transactions" 
                 sleeper(3)
         acutal_collection = getlogindexFromOtherDB(main_db_ip,main_db_port)
         state_collection = getRecordFromStateDB(state_db_ip,state_db_port)
@@ -465,10 +467,10 @@ def indexing(command):
                                                        "job_id" : indexedList[i]['job_id'] }, True)
             if i in lastLineList:
                 logFilecollection.insert({"service":logFileList[j]['service'], "system":logFileList[j]['system'], "node":logFileList[j]['node'], "process":logFileList[j]['process'], "path":logFileList[j]['path'], "datetime":logFileList[j]['datetime']}) 
-                print logFileList[j]['path']
+                print "["+datetime.datetime.fromtimestamp(int(getExecuteTime())).strftime('%Y-%m-%d %H:%M:%S')+"] Done writing: "+logFileList[j]['path']
                 j = j+1
             if i%500==0 :
-                print indexedList[i]['lastLine']
+                print "["+datetime.datetime.fromtimestamp(int(getExecuteTime())).strftime('%Y-%m-%d %H:%M:%S')+"] Indexing line: " +str(indexedList[i]['lastLine'])+": "+logFileList[j]['path']
                 state_collection.update({'jobID': job_id}, {"$set": {'state': "indexing", 'lastFileName':indexedList[i]['path'],
                                                                                  'lastDoneRecord':indexedList[i]['lastLine'],'db_ip':LOCAL_IP}}) 
             i = i+1
@@ -603,14 +605,14 @@ class keepAliveThread (threading.Thread):
                 #self.nextkeepAliveTime = self.keepAliveTime+KEEPALIVE_TIME_GAP
                 if(self.doneFlag == False):
                     if(self.op == "indexing"):
-                        print self.jobid+"##indexing"
+                        #print "["+datetime.datetime.fromtimestamp(int(getExecuteTime())).strftime('%Y-%m-%d %H:%M:%S')+"] self.jobid+"##indexing"
                         client.send (self.jobid+'##indexing')
                     else:
                         print self.jobid+"##writing"
                         client.send (self.jobid+'##writing')
                 else:
                     if(self.op == "indexing"):
-                        print self.jobid+"##indexing-done"
+                        print "["+datetime.datetime.fromtimestamp(int(getExecuteTime())).strftime('%Y-%m-%d %H:%M:%S')+"] "+self.jobid+"##indexing-done"
                         client.send (self.jobid+'##indexing-done')  
                         client.close()
                     else:  
@@ -619,7 +621,7 @@ class keepAliveThread (threading.Thread):
                         client.close()                  
             except socket.error:
                 #came out of loop
-                print "Master Bye!!!"
+                print "["+datetime.datetime.fromtimestamp(int(getExecuteTime())).strftime('%Y-%m-%d %H:%M:%S')+"] Master Bye!!!"
                 client.close()
                 break
     def setDoneFlag(self,doneFlag):
@@ -642,7 +644,7 @@ class HandleMsg (threading.Thread):
         #        eHolder>##<dateRegex>##<dateFormat>##<timeRegex>##<timeFormat>##<mmin\
         #        >##<interval>## lastIndexedFile ##LastDoneRecord=Line_num"
         # Split command
-        print "Got Task : "+datetime.datetime.fromtimestamp(int(getExecuteTime())).strftime('%Y-%m-%d %H:%M:%S')
+        print "["+datetime.datetime.fromtimestamp(int(getExecuteTime())).strftime('%Y-%m-%d %H:%M:%S')+"] Got Task from Master"
         print data
         cmd = data.split("##")
         jobid = cmd[1]
