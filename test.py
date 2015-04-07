@@ -139,202 +139,252 @@ def indexing(command):
     #HeartBeatThread.setDoneFlag(True)
     #HeartBeatThread.setStopFlag(True)
     
-    #try:
-    #======== index mode ============
-    print "Start Indexing"
-    if(command[8] == "singleLine"):
-        job_id = command[1]
-        state_db_ip = (command[2].split(":"))[0]
-        state_db_port = int((command[2].split(":"))[1])
-        service = command[3]
-        system = command[4]
-        node = command[5]
-        process = command[6]
-        logPath = command[7]
-        logType = command[8]
-        msisdnRegex = re.compile(command[9])
-        dateHolder = command[10]
-        dateRegex = re.compile(command[11])
-        dateFormat = command[12]
-        timeRegex = re.compile(command[13])
-        timeFormat = command[14]
-        mmin = command[15]
-        interval = command[16]
-        lastIndexedFile = command[17]
-        LastDoneRecord = command[18]
-        main_db_ip = (command[19].split(":"))[0]
-        main_db_port = int((command[19].split(":"))[1])
-    elif(command[8] == "multiLine"):
-        job_id = command[1]
-        state_db_ip = (command[2].split(":"))[0]
-        state_db_port = int((command[2].split(":"))[1])
-        service = command[3]
-        system = command[4]
-        node = command[5]
-        process = command[6]
-        logPath = command[7]
-        logType = command[8]
-        logStartTag = re.compile(command[9])
-        logEndTag = re.compile(command[10])
-        msisdnRegex = re.compile(command[11])
-        dateHolder = command[12]
-        dateRegex = re.compile(command[13])
-        dateFormat = command[14]
-        timeRegex = re.compile(command[15])
-        timeFormat = command[16]
-        mmin = command[17]
-        interval = command[18]
-        lastIndexedFile = command[19]
-        LastDoneRecord = command[20]
-        main_db_ip = (command[21].split(":"))[0]
-        main_db_port = int((command[21].split(":"))[1])
-    
-    
-    # generate find command
-    find_cmd = 'find ' + logPath + ' -type f'
-    if mmin != "":
-        find_cmd += ' -mmin -' + mmin
-    if interval != "":
-        find_cmd += ' -mmin +' + interval
-    indexLogFile = openLogFile()
-###################################################################
-    
-    dateTimeFormat = dateFormat + ' ' + timeFormat
-    
-    print "["+datetime.datetime.fromtimestamp(int(getExecuteTime())).strftime('%Y-%m-%d %H:%M:%S')+"] Find file with '"+ find_cmd +"'"
-    # find file
-    f = os.popen(find_cmd)
-    files = f.readlines()
-    if len(files) == 0:
-        #####################################################Sleeper()
-        sleeper(3)
-        e = sys.exc_info()[0]
-        HeartBeatThread.setDoneFlag(True)
-        print( "["+datetime.datetime.fromtimestamp(int(getExecuteTime())).strftime('%Y-%m-%d %H:%M:%S')+"] <p>Error: %s</p>" % e )
-    else:             
-        #startFile = False
-        startLine = False
-        indexedList = []
-        logFileList = []
-        lastLineList = []
-        recordCount = -1
-        #error = False
-        # collection = getlogindexFromLocalDB()
-        logFilecollection = getlogfileFromActualDB(main_db_ip,main_db_port)
-        for file in files:
-            #if lastIndexedFile == file:
-            #    startFile = True
-            #if lastIndexedFile == "" or startFile:
-            try:
-                
-                today = datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S')
-                #########################
-                ## read file from path ##
-                ###############################################
-                file_path = file.rstrip('\n')
-    #            if mode == 'test':
-    #                print "PATH: " + file_path + "\n"
-    #                print '{0:6}  {1:11}  {2:19}  {3:8}  {4:6}'.format('index', 'msisdn', 'datetime', 'startTag', 'endTag')
-    #            else:
-                    # check file already indexed?
-                
-                cursor = logFilecollection.find_one({"service":service, "system":system, "node":node, "process":process, "path":file_path})
-                if cursor: # already indexed, skip
-                    print "["+datetime.datetime.fromtimestamp(int(getExecuteTime())).strftime('%Y-%m-%d %H:%M:%S')+"] "+file_path + ", This file is already indexed."
-                    indexLogFile.write( today + " Skip " + file_path + " , This file is already indexed\n")
-                    continue
-                else: # not indexed add path and date to database
-                    print "["+datetime.datetime.fromtimestamp(int(getExecuteTime())).strftime('%Y-%m-%d %H:%M:%S')+"] "+file_path + ", This file not already indexed."
-                    indexLogFile.write( today + " Index " + file_path + " , This file is not already indexed\n")
-                    logFileDict = {
-                           'service': service,
-                           'system':system,
-                           'node':node,
-                           'process':process,
-                           'path': file_path,
-                           'datetime': today
-                           }
-                    #logFileList.append(logFileDict)
+    try:
+        #======== index mode ============
+        print "Start Indexing"
+        if(command[8] == "singleLine"):
+            job_id = command[1]
+            state_db_ip = (command[2].split(":"))[0]
+            state_db_port = int((command[2].split(":"))[1])
+            service = command[3]
+            system = command[4]
+            node = command[5]
+            process = command[6]
+            logPath = command[7]
+            logType = command[8]
+            msisdnRegex = re.compile(command[9])
+            dateHolder = command[10]
+            dateRegex = re.compile(command[11])
+            dateFormat = command[12]
+            timeRegex = re.compile(command[13])
+            timeFormat = command[14]
+            mmin = command[15]
+            interval = command[16]
+            lastIndexedFile = command[17]
+            LastDoneRecord = command[18]
+            main_db_ip = (command[19].split(":"))[0]
+            main_db_port = int((command[19].split(":"))[1])
+        elif(command[8] == "multiLine"):
+            job_id = command[1]
+            state_db_ip = (command[2].split(":"))[0]
+            state_db_port = int((command[2].split(":"))[1])
+            service = command[3]
+            system = command[4]
+            node = command[5]
+            process = command[6]
+            logPath = command[7]
+            logType = command[8]
+            logStartTag = re.compile(command[9])
+            logEndTag = re.compile(command[10])
+            msisdnRegex = re.compile(command[11])
+            dateHolder = command[12]
+            dateRegex = re.compile(command[13])
+            dateFormat = command[14]
+            timeRegex = re.compile(command[15])
+            timeFormat = command[16]
+            mmin = command[17]
+            interval = command[18]
+            lastIndexedFile = command[19]
+            LastDoneRecord = command[20]
+            main_db_ip = (command[21].split(":"))[0]
+            main_db_port = int((command[21].split(":"))[1])
+        
+        
+        # generate find command
+        find_cmd = 'find ' + logPath + ' -type f'
+        if mmin != "":
+            find_cmd += ' -mmin -' + mmin
+        if interval != "":
+            find_cmd += ' -mmin +' + interval
+        indexLogFile = openLogFile()
+    ###################################################################
+        
+        dateTimeFormat = dateFormat + ' ' + timeFormat
+        
+        print "["+datetime.datetime.fromtimestamp(int(getExecuteTime())).strftime('%Y-%m-%d %H:%M:%S')+"] Find file with '"+ find_cmd +"'"
+        # find file
+        f = os.popen(find_cmd)
+        files = f.readlines()
+        if len(files) == 0:
+            #####################################################Sleeper()
+            sleeper(3)
+            e = sys.exc_info()[0]
+            HeartBeatThread.setDoneFlag(True)
+            print( "["+datetime.datetime.fromtimestamp(int(getExecuteTime())).strftime('%Y-%m-%d %H:%M:%S')+"] <p>Error: %s</p>" % e )
+        else:             
+            #startFile = False
+            startLine = False
+            indexedList = []
+            logFileList = []
+            lastLineList = []
+            recordCount = -1
+            #error = False
+            # collection = getlogindexFromLocalDB()
+            logFilecollection = getlogfileFromActualDB(main_db_ip,main_db_port)
+            for file in files:
+                #if lastIndexedFile == file:
+                #    startFile = True
+                #if lastIndexedFile == "" or startFile:
+                try:
                     
-                if '.gz' in file_path:
-                    fileContent = gzip.open(file_path,'r')
-                else:
-                    fileContent = open(file_path,'r')
-                ###############################################
-        
-                ##########################
-                ## define some variable ##
-                ###############################################
-                lineNumber = 0
-                msisdn = ''
-                date = ''
-                time = ''
-                index = 0
-                startTag = 0
-                endTag = 0
-                showRecord = 0
-                isIndexed = False
-                ###############################################
-        
-                #########################################
-                ## if date in path, get date from path ##
-                #################################################################
-                if dateHolder == 'outside' and dateRegex.search(file_path) != None:
-                    date = dateRegex.search(file_path).group(1)
-                #################################################################
-                #print "***************************"
-                #print fileContent
-                #print lastIndexedFile.rstrip('\n') 
-                #print file_path
-                #print "***************************"
-                for line in fileContent:
-                    lineNumber = int(lineNumber) + 1
-                    # check if the current line match last done record of the last indexed file
-                    if int(LastDoneRecord)+1 == lineNumber and lastIndexedFile.rstrip('\n')  == file_path and lastIndexedFile != '' :
-                        #print lineNumber
-                        startLine = True
-                    if LastDoneRecord == "-1" or startLine or lastIndexedFile.rstrip('\n')  != file_path or lastIndexedFile == '':
-                        # To resume unfinished job
-                        # Check the file name and set line number
-                        #if lastIndexedFile in file and lastIndexedFile != '':
-                        #    lineNumber = int(LastDoneRecord)
-                            
-                        if showRecord == 110: # in test mode exit when already show 110 indexs
-                            sys.exit(1)
-                        #############################
-                        ## Find msisdn, date, time ##
-                        #############################################################
-                        if msisdn == '' and msisdnRegex.search(line) != None:
-                            msisdn = msisdnRegex.search(line).group(1)
-                            index = lineNumber
-                        if dateHolder == 'inside' and date == '' and dateRegex.search(line) != None:
-                            date = dateRegex.search(line).group(1)
-                        if time == '' and timeRegex.search(line) != None:
-                            time = timeRegex.search(line).group(1)
-                        #############################################################
+                    today = datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S')
+                    #########################
+                    ## read file from path ##
+                    ###############################################
+                    file_path = file.rstrip('\n')
+        #            if mode == 'test':
+        #                print "PATH: " + file_path + "\n"
+        #                print '{0:6}  {1:11}  {2:19}  {3:8}  {4:6}'.format('index', 'msisdn', 'datetime', 'startTag', 'endTag')
+        #            else:
+                        # check file already indexed?
+                    
+                    cursor = logFilecollection.find_one({"service":service, "system":system, "node":node, "process":process, "path":file_path})
+                    if cursor: # already indexed, skip
+                        print "["+datetime.datetime.fromtimestamp(int(getExecuteTime())).strftime('%Y-%m-%d %H:%M:%S')+"] "+file_path + ", This file is already indexed."
+                        indexLogFile.write( today + " Skip " + file_path + " , This file is already indexed\n")
+                        continue
+                    else: # not indexed add path and date to database
+                        print "["+datetime.datetime.fromtimestamp(int(getExecuteTime())).strftime('%Y-%m-%d %H:%M:%S')+"] "+file_path + ", This file not already indexed."
+                        indexLogFile.write( today + " Index " + file_path + " , This file is not already indexed\n")
+                        logFileDict = {
+                               'service': service,
+                               'system':system,
+                               'node':node,
+                               'process':process,
+                               'path': file_path,
+                               'datetime': today
+                               }
+                        #logFileList.append(logFileDict)
+                        
+                    if '.gz' in file_path:
+                        fileContent = gzip.open(file_path,'r')
+                    else:
+                        fileContent = open(file_path,'r')
+                    ###############################################
             
-                        ######################
-                        ## if multiline log ##
-                        #############################################################
-                        if logType == 'multiLine':
-                            # when find start tag
-                            if logStartTag.search(line) != None:
-                                startTag = lineNumber
-                            # when find end tag
-                            if logEndTag.search(line) != None:
-                                endTag = lineNumber
+                    ##########################
+                    ## define some variable ##
+                    ###############################################
+                    lineNumber = 0
+                    msisdn = ''
+                    date = ''
+                    time = ''
+                    index = 0
+                    startTag = 0
+                    endTag = 0
+                    showRecord = 0
+                    isIndexed = False
+                    ###############################################
+            
+                    #########################################
+                    ## if date in path, get date from path ##
+                    #################################################################
+                    if dateHolder == 'outside' and dateRegex.search(file_path) != None:
+                        date = dateRegex.search(file_path).group(1)
+                    #################################################################
+                    #print "***************************"
+                    #print fileContent
+                    #print lastIndexedFile.rstrip('\n') 
+                    #print file_path
+                    #print "***************************"
+                    for line in fileContent:
+                        lineNumber = int(lineNumber) + 1
+                        # check if the current line match last done record of the last indexed file
+                        if int(LastDoneRecord)+1 == lineNumber and lastIndexedFile.rstrip('\n')  == file_path and lastIndexedFile != '' :
+                            #print lineNumber
+                            startLine = True
+                        if LastDoneRecord == "-1" or startLine or lastIndexedFile.rstrip('\n')  != file_path or lastIndexedFile == '':
+                            # To resume unfinished job
+                            # Check the file name and set line number
+                            #if lastIndexedFile in file and lastIndexedFile != '':
+                            #    lineNumber = int(LastDoneRecord)
+                                
+                            if showRecord == 110: # in test mode exit when already show 110 indexs
+                                sys.exit(1)
+                            #############################
+                            ## Find msisdn, date, time ##
+                            #############################################################
+                            if msisdn == '' and msisdnRegex.search(line) != None:
+                                msisdn = msisdnRegex.search(line).group(1)
+                                index = lineNumber
+                            if dateHolder == 'inside' and date == '' and dateRegex.search(line) != None:
+                                date = dateRegex.search(line).group(1)
+                            if time == '' and timeRegex.search(line) != None:
+                                time = timeRegex.search(line).group(1)
+                            #############################################################
+                
+                            ######################
+                            ## if multiline log ##
+                            #############################################################
+                            if logType == 'multiLine':
+                                # when find start tag
+                                if logStartTag.search(line) != None:
+                                    startTag = lineNumber
+                                # when find end tag
+                                if logEndTag.search(line) != None:
+                                    endTag = lineNumber
+                                    # if get all variable that require will print or insert in database
+                                    if msisdn != '' and date != '' and time != '':
+                                        # combine date time and change format
+                                        fullDateTime = date + ' ' + time
+                                        fullDateTime = datetime.datetime.strptime(fullDateTime, dateTimeFormat)
+                                        fullDateTime = fullDateTime.strftime('%Y/%m/%d %H:%M:%S')
+            #                            if mode == 'test':
+            #                                print '{0:6d}  {1:11}  {2:19}  {3:8d}  {4:6d}'.format(index, msisdn, fullDateTime, startTag, endTag)
+            #                                showRecord += 1
+            #                            else:
+                                        indexedDict = {
+                                                       "service": service,
+                                                              "system": system,
+                                                               "node": node,
+                                                            "process": process,
+                                                               "path": file_path,
+                                                               "msisdn": msisdn,
+                                                               "index": index,
+                                                               "datetime": fullDateTime,
+                                                               "startTag": startTag,
+                                                               "endTag": endTag,
+                                                               "job_id" : job_id,
+                                                               "lastLine" : lineNumber
+                                                       }
+                                        indexedList.append(indexedDict)
+                                        recordCount = recordCount+1  
+                                        isIndexed = True
+                                        #collection.insert({ "service": service,
+                                        #                      "system": system,
+                                        #                       "node": node,
+                                        #                    "process": process,
+                                        #                       "path": file_path,
+                                        #                       "msisdn": msisdn,
+                                        #                       "index": index,
+                                        #                       "datetime": fullDateTime,
+                                        #                       "startTag": startTag,
+                                        #                       "endTag": endTag,
+                                        #                       "job_id" : job_id })
+                                    # clear variable when found end tag
+                                    msisdn = ''
+                                    time = ''
+                                    startTag = 0
+                                    endTag = 0
+                                    if dateHolder == 'inside':
+                                        date = ''    # if date in log
+                            #############################################################
+                            #######################
+                            ## if singleline log ##
+                            #############################################################
+                            elif logType == 'singleLine':
                                 # if get all variable that require will print or insert in database
                                 if msisdn != '' and date != '' and time != '':
                                     # combine date time and change format
                                     fullDateTime = date + ' ' + time
                                     fullDateTime = datetime.datetime.strptime(fullDateTime, dateTimeFormat)
                                     fullDateTime = fullDateTime.strftime('%Y/%m/%d %H:%M:%S')
-        #                            if mode == 'test':
-        #                                print '{0:6d}  {1:11}  {2:19}  {3:8d}  {4:6d}'.format(index, msisdn, fullDateTime, startTag, endTag)
-        #                                showRecord += 1
-        #                            else:
+            #                        if mode == 'test':
+            #                            print '{0:6d}  {1:11}  {2:19}  {3:8d}  {4:6d}'.format(index, msisdn, fullDateTime, index, index)
+            #                            showRecord += 1
+            #                        else:
                                     indexedDict = {
-                                                   "service": service,
+                                                       "service": service,
                                                           "system": system,
                                                            "node": node,
                                                         "process": process,
@@ -342,14 +392,14 @@ def indexing(command):
                                                            "msisdn": msisdn,
                                                            "index": index,
                                                            "datetime": fullDateTime,
-                                                           "startTag": startTag,
-                                                           "endTag": endTag,
+                                                           "startTag": index,
+                                                           "endTag": index,
                                                            "job_id" : job_id,
                                                            "lastLine" : lineNumber
-                                                   }
+                                                       }
                                     indexedList.append(indexedDict)
-                                    recordCount = recordCount+1  
-                                    isIndexed = True
+                                    recordCount = recordCount+1 
+                                    isIndexed = True 
                                     #collection.insert({ "service": service,
                                     #                      "system": system,
                                     #                       "node": node,
@@ -358,135 +408,85 @@ def indexing(command):
                                     #                       "msisdn": msisdn,
                                     #                       "index": index,
                                     #                       "datetime": fullDateTime,
-                                    #                       "startTag": startTag,
-                                    #                       "endTag": endTag,
+                                    #                       "startTag": index,
+                                    #                       "endTag": index,
                                     #                       "job_id" : job_id })
-                                # clear variable when found end tag
+                                #clear variable every line
                                 msisdn = ''
                                 time = ''
-                                startTag = 0
-                                endTag = 0
                                 if dateHolder == 'inside':
-                                    date = ''    # if date in log
-                        #############################################################
-                        #######################
-                        ## if singleline log ##
-                        #############################################################
-                        elif logType == 'singleLine':
-                            # if get all variable that require will print or insert in database
-                            if msisdn != '' and date != '' and time != '':
-                                # combine date time and change format
-                                fullDateTime = date + ' ' + time
-                                fullDateTime = datetime.datetime.strptime(fullDateTime, dateTimeFormat)
-                                fullDateTime = fullDateTime.strftime('%Y/%m/%d %H:%M:%S')
-        #                        if mode == 'test':
-        #                            print '{0:6d}  {1:11}  {2:19}  {3:8d}  {4:6d}'.format(index, msisdn, fullDateTime, index, index)
-        #                            showRecord += 1
-        #                        else:
-                                indexedDict = {
-                                                   "service": service,
-                                                      "system": system,
-                                                       "node": node,
-                                                    "process": process,
-                                                       "path": file_path,
-                                                       "msisdn": msisdn,
-                                                       "index": index,
-                                                       "datetime": fullDateTime,
-                                                       "startTag": index,
-                                                       "endTag": index,
-                                                       "job_id" : job_id,
-                                                       "lastLine" : lineNumber
-                                                   }
-                                indexedList.append(indexedDict)
-                                recordCount = recordCount+1 
-                                isIndexed = True 
-                                #collection.insert({ "service": service,
-                                #                      "system": system,
-                                #                       "node": node,
-                                #                    "process": process,
-                                #                       "path": file_path,
-                                #                       "msisdn": msisdn,
-                                #                       "index": index,
-                                #                       "datetime": fullDateTime,
-                                #                       "startTag": index,
-                                #                       "endTag": index,
-                                #                       "job_id" : job_id })
-                            #clear variable every line
-                            msisdn = ''
-                            time = ''
-                            if dateHolder == 'inside':
-                                date = ''    #if date in log
-                        #############################################################
-                        # print lineNumber
-                        #if lineNumber%1000 ==0 :
-                        #    state_collection = getRecordFromStateDB(state_db_ip,state_db_port)
-                        #    state_collection.update({'jobID': job_id}, {"$set": {'state': "indexing", 'lastFileName':file,
-                        #                                                        'lastDoneRecord':lineNumber,'db_ip':LOCAL_IP}}) 
-                                                  
-                fileContent.close()
-                lastLineList.append(recordCount)
-                # insert only specified type of log
-                if isIndexed:
-                    logFileList.append(logFileDict)
-                # for index test, index a file then exit
-    #            if mode == 'test':
-    #                break
-            except IOError:
-                sleeper(3)
-                HeartBeatThread.setStopFlag(True)
-                print "["+datetime.datetime.fromtimestamp(int(getExecuteTime())).strftime('%Y-%m-%d %H:%M:%S')+"] I/O error"              
-        #collection = getlogindexFromLocalDB()
-        
-        #print lastLineList
-        #if len(logFileList) > 0:
-        #    print logFileList[0]
-        while 1:
-            if(DBTransactions(main_db_ip, main_db_port) < 4500):
-                break
-            else:
-                print "["+datetime.datetime.fromtimestamp(int(getExecuteTime())).strftime('%Y-%m-%d %H:%M:%S')+"] Indexed_DB : "+job_id+" : too many concurrent transactions" 
-                sleeper(3)
-        acutal_collection = getlogindexFromOtherDB(main_db_ip,main_db_port)
-        state_collection = getRecordFromStateDB(state_db_ip,state_db_port)
-        i=0
-        j=0
-        while (i<len(indexedList)):
+                                    date = ''    #if date in log
+                            #############################################################
+                            # print lineNumber
+                            #if lineNumber%1000 ==0 :
+                            #    state_collection = getRecordFromStateDB(state_db_ip,state_db_port)
+                            #    state_collection.update({'jobID': job_id}, {"$set": {'state': "indexing", 'lastFileName':file,
+                            #                                                        'lastDoneRecord':lineNumber,'db_ip':LOCAL_IP}}) 
+                                                      
+                    fileContent.close()
+                    lastLineList.append(recordCount)
+                    # insert only specified type of log
+                    if isIndexed:
+                        logFileList.append(logFileDict)
+                    # for index test, index a file then exit
+        #            if mode == 'test':
+        #                break
+                except IOError:
+                    sleeper(3)
+                    HeartBeatThread.setStopFlag(True)
+                    print "["+datetime.datetime.fromtimestamp(int(getExecuteTime())).strftime('%Y-%m-%d %H:%M:%S')+"] I/O error"              
+            #collection = getlogindexFromLocalDB()
             
-            # Upsert to DB
-           
-            acutal_collection.update( {"$and": [{"index": indexedList[i]['index']},{"startTag": indexedList[i]['startTag']},{"endTag": indexedList[i]['endTag']}, {"job_id":indexedList[i]['job_id']}]},{ "service": indexedList[i]['service'],
-                                                      "system": indexedList[i]['system'],
-                                                       "node": indexedList[i]['node'],
-                                                    "process": indexedList[i]['process'],
-                                                       "path": indexedList[i]['path'],
-                                                       "msisdn": indexedList[i]['msisdn'],
-                                                       "index": indexedList[i]['index'],
-                                                       "datetime": indexedList[i]['datetime'],
-                                                       "startTag": indexedList[i]['startTag'],
-                                                       "endTag": indexedList[i]['endTag'],
-                                                       "job_id" : indexedList[i]['job_id'] }, True)
-            if i in lastLineList:
-                logFilecollection.insert({"service":logFileList[j]['service'], "system":logFileList[j]['system'], "node":logFileList[j]['node'], "process":logFileList[j]['process'], "path":logFileList[j]['path'], "datetime":logFileList[j]['datetime']}) 
-                print "["+datetime.datetime.fromtimestamp(int(getExecuteTime())).strftime('%Y-%m-%d %H:%M:%S')+"] Done writing: "+logFileList[j]['path']
-                j = j+1
-            if i%500==0 :
-                print "["+datetime.datetime.fromtimestamp(int(getExecuteTime())).strftime('%Y-%m-%d %H:%M:%S')+"] Indexing line: " +str(indexedList[i]['lastLine'])+": "+logFileList[j]['path']
-                state_collection.update({'jobID': job_id}, {"$set": {'state': "indexing", 'lastFileName':indexedList[i]['path'],
-                                                                                 'lastDoneRecord':indexedList[i]['lastLine'],'db_ip':LOCAL_IP}}) 
-            i = i+1
-        indexLogFile.close()
-        #for i in range(0,len(logFileList)):
-        #    logFilecollection.insert({"service":logFileList[i]['service'], "system":logFileList[i]['system'], "node":logFileList[i]['node'], "process":logFileList[i]['process'], "path":logFileList[i]['path'], "datetime":logFileList[i]['datetime']}) 
-        HeartBeatThread.setDoneFlag(True) 
-          
-        #    if mode != 'test':
+            #print lastLineList
+            #if len(logFileList) > 0:
+            #    print logFileList[0]
+            while 1:
+                if(DBTransactions(main_db_ip, main_db_port) < 4500):
+                    break
+                else:
+                    print "["+datetime.datetime.fromtimestamp(int(getExecuteTime())).strftime('%Y-%m-%d %H:%M:%S')+"] Indexed_DB : "+job_id+" : too many concurrent transactions" 
+                    sleeper(3)
+            acutal_collection = getlogindexFromOtherDB(main_db_ip,main_db_port)
+            state_collection = getRecordFromStateDB(state_db_ip,state_db_port)
+            i=0
+            j=0
+            while (i<len(indexedList)):
                 
-    # except:
+                # Upsert to DB
+               
+                acutal_collection.update( {"$and": [{"index": indexedList[i]['index']},{"startTag": indexedList[i]['startTag']},{"endTag": indexedList[i]['endTag']}, {"job_id":indexedList[i]['job_id']}]},{ "service": indexedList[i]['service'],
+                                                          "system": indexedList[i]['system'],
+                                                           "node": indexedList[i]['node'],
+                                                        "process": indexedList[i]['process'],
+                                                           "path": indexedList[i]['path'],
+                                                           "msisdn": indexedList[i]['msisdn'],
+                                                           "index": indexedList[i]['index'],
+                                                           "datetime": indexedList[i]['datetime'],
+                                                           "startTag": indexedList[i]['startTag'],
+                                                           "endTag": indexedList[i]['endTag'],
+                                                           "job_id" : indexedList[i]['job_id'] }, True)
+                if i in lastLineList:
+                    logFilecollection.insert({"service":logFileList[j]['service'], "system":logFileList[j]['system'], "node":logFileList[j]['node'], "process":logFileList[j]['process'], "path":logFileList[j]['path'], "datetime":logFileList[j]['datetime']}) 
+                    print "["+datetime.datetime.fromtimestamp(int(getExecuteTime())).strftime('%Y-%m-%d %H:%M:%S')+"] Done writing: "+logFileList[j]['path']
+                    j = j+1
+                if i%500==0 :
+                    print "["+datetime.datetime.fromtimestamp(int(getExecuteTime())).strftime('%Y-%m-%d %H:%M:%S')+"] Indexing line: " +str(indexedList[i]['lastLine'])+": "+logFileList[j]['path']
+                    state_collection.update({'jobID': job_id}, {"$set": {'state': "indexing", 'lastFileName':indexedList[i]['path'],
+                                                                                     'lastDoneRecord':indexedList[i]['lastLine'],'db_ip':LOCAL_IP}}) 
+                i = i+1
+            indexLogFile.close()
+            #for i in range(0,len(logFileList)):
+            #    logFilecollection.insert({"service":logFileList[i]['service'], "system":logFileList[i]['system'], "node":logFileList[i]['node'], "process":logFileList[i]['process'], "path":logFileList[i]['path'], "datetime":logFileList[i]['datetime']}) 
+            HeartBeatThread.setDoneFlag(True) 
+              
+            #    if mode != 'test':
+                
+    except:
     #     ###Sleeper(3)
-    #     sleeper(3)
+        sleeper(3)
     ##     e = sys.exc_info()[0]
-    #    HeartBeatThread.setStopFlag(True)
-    #    print( "<p>Error: %s</p>" % e )
+        HeartBeatThread.setStopFlag(True)
+        print( "<p>Error: %s</p>" % e )
     #stop = timeit.default_timer()
     #print stop-start
         
