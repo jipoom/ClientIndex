@@ -466,7 +466,7 @@ def indexing(command):
     except:
     #     ###Sleeper(3)
         sleeper(3)
-    ##     e = sys.exc_info()[0]
+        e = sys.exc_info()[0]
         HeartBeatThread.setStopFlag(True)
         print( "<p>Error: %s</p>" % e )
     #stop = timeit.default_timer()
